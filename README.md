@@ -1,7 +1,5 @@
 # WorkHubb - Job Board
 
-![WorkHubb Logo](public/placeholder-logo.svg)
-
 Uma plataforma moderna e intuitiva que conecta talentos de tecnologia com as melhores oportunidades do mercado brasileiro.
 
 ## 🚀 Sobre o Projeto
