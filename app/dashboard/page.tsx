@@ -45,18 +45,18 @@ export default function DashboardPage() {
     loadMyJobs(currentUser.id)
   }, [router])
 
-  const loadMyJobs = (userId: string) => {
-    const allJobs = getJobs()
+  const loadMyJobs = async (userId: string) => {
+    const allJobs = await getJobs()
     const filtered = allJobs.filter((job) => job.authorId === userId)
     setMyJobs(filtered)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!user) return
 
-    const newJob = addJob({
+    const newJob = await addJob({
       title: formData.title,
       company: user.company || user.name,
       location: formData.location,

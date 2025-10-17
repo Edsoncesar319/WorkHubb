@@ -29,7 +29,7 @@ export default function RegisterPage() {
   })
   const [error, setError] = useState("")
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
 
@@ -38,27 +38,34 @@ export default function RegisterPage() {
       return
     }
 
-    if (findUserByEmail(formData.email)) {
-      setError("Este email já está cadastrado")
-      return
-    }
+    try {
+      // Verificar se o email já existe
+      const existingUser = await findUserByEmail(formData.email)
+      if (existingUser) {
+        setError("Este email já está cadastrado")
+        return
+      }
 
-    const newUser: User = {
-      id: Date.now().toString(),
-      name: formData.name,
-      email: formData.email,
-      type: userType,
-      bio: formData.bio || undefined,
-      stack: formData.stack || undefined,
-      github: formData.github || undefined,
-      linkedin: formData.linkedin || undefined,
-      company: userType === "company" ? formData.company : undefined,
-      createdAt: new Date().toISOString(),
-    }
+      const newUser: User = {
+        id: Date.now().toString(),
+        name: formData.name,
+        email: formData.email,
+        type: userType,
+        bio: formData.bio || undefined,
+        stack: formData.stack || undefined,
+        github: formData.github || undefined,
+        linkedin: formData.linkedin || undefined,
+        company: userType === "company" ? formData.company : undefined,
+        createdAt: new Date().toISOString(),
+      }
 
-    addUser(newUser)
-    setCurrentUser(newUser)
-    router.push(userType === "company" ? "/dashboard" : "/jobs")
+      await addUser(newUser)
+      setCurrentUser(newUser)
+      router.push(userType === "company" ? "/dashboard" : "/jobs")
+    } catch (error) {
+      console.error('Error creating user:', error)
+      setError("Erro ao criar conta. Tente novamente.")
+    }
   }
 
   return (

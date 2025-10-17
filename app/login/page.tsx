@@ -20,21 +20,26 @@ export default function LoginPage() {
   })
   const [error, setError] = useState("")
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
 
-    const user = findUserByEmail(formData.email)
+    try {
+      const user = await findUserByEmail(formData.email)
 
-    if (!user) {
-      setError("Email não encontrado")
-      return
+      if (!user) {
+        setError("Email não encontrado")
+        return
+      }
+
+      // In a real app, you'd verify the password hash
+      // For demo purposes, we'll just log them in
+      setCurrentUser(user)
+      router.push(user.type === "company" ? "/dashboard" : "/jobs")
+    } catch (error) {
+      console.error('Error during login:', error)
+      setError("Erro ao fazer login. Tente novamente.")
     }
-
-    // In a real app, you'd verify the password hash
-    // For demo purposes, we'll just log them in
-    setCurrentUser(user)
-    router.push(user.type === "company" ? "/dashboard" : "/jobs")
   }
 
   return (

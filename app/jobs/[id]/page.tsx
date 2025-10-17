@@ -22,16 +22,20 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const user = getCurrentUser()
 
   useEffect(() => {
-    const foundJob = getJobById(params.id)
-    if (foundJob) {
-      setJob(foundJob)
-      if (user) {
-        setApplied(hasApplied(user.id, params.id))
+    const loadJobData = async () => {
+      const foundJob = await getJobById(params.id)
+      if (foundJob) {
+        setJob(foundJob)
+        if (user) {
+          const hasUserApplied = await hasApplied(user.id, params.id)
+          setApplied(hasUserApplied)
+        }
       }
     }
+    loadJobData()
   }, [params.id, user])
 
-  const handleApply = () => {
+  const handleApply = async () => {
     if (!user) {
       router.push("/login")
       return
@@ -44,7 +48,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
     if (!job) return
 
-    addApplication({
+    await addApplication({
       userId: user.id,
       jobId: job.id,
       message,

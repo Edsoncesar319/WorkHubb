@@ -14,7 +14,11 @@ export default function JobsPage() {
   const [remoteFilter, setRemoteFilter] = useState<boolean | null>(null)
 
   useEffect(() => {
-    setJobs(getJobs())
+    const loadJobs = async () => {
+      const jobsData = await getJobs()
+      setJobs(jobsData)
+    }
+    loadJobs()
   }, [])
 
   const filteredJobs = jobs.filter((job) => {

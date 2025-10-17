@@ -1,135 +1,115 @@
 import type { Job, Application, User } from "./types"
 
-const JOBS_KEY = "workhubb_jobs"
-const APPLICATIONS_KEY = "workhubb_applications"
-const USERS_KEY = "workhubb_users"
-
-// Mock initial jobs
-const initialJobs: Job[] = [
-  {
-    id: "1",
-    title: "Senior Full Stack Developer",
-    company: "TechCorp",
-    location: "São Paulo, SP",
-    remote: true,
-    salary: "R$ 12.000 - R$ 18.000",
-    description: "Estamos procurando um desenvolvedor full stack experiente para liderar projetos inovadores.",
-    requirements: ["React", "Node.js", "TypeScript", "PostgreSQL", "5+ anos de experiência"],
-    authorId: "company1",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    title: "Frontend Developer React",
-    company: "StartupXYZ",
-    location: "Remoto",
-    remote: true,
-    salary: "R$ 8.000 - R$ 12.000",
-    description: "Junte-se à nossa equipe para criar interfaces incríveis e responsivas.",
-    requirements: ["React", "Next.js", "Tailwind CSS", "Git", "3+ anos de experiência"],
-    authorId: "company2",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "3",
-    title: "Backend Developer Python",
-    company: "DataTech Solutions",
-    location: "Rio de Janeiro, RJ",
-    remote: false,
-    salary: "R$ 10.000 - R$ 15.000",
-    description: "Desenvolva APIs robustas e escaláveis para nossos produtos de dados.",
-    requirements: ["Python", "Django/Flask", "PostgreSQL", "Docker", "AWS"],
-    authorId: "company3",
-    createdAt: new Date().toISOString(),
-  },
-]
-
-export function getJobs(): Job[] {
-  if (typeof window === "undefined") return initialJobs
-
-  const stored = localStorage.getItem(JOBS_KEY)
-  if (!stored) {
-    localStorage.setItem(JOBS_KEY, JSON.stringify(initialJobs))
-    return initialJobs
+// Funções para vagas
+export async function getJobs(): Promise<Job[]> {
+  const response = await fetch('/api/jobs')
+  if (!response.ok) {
+    throw new Error('Failed to fetch jobs')
   }
-
-  try {
-    return JSON.parse(stored)
-  } catch {
-    return initialJobs
-  }
+  return await response.json()
 }
 
-export function getJobById(id: string): Job | undefined {
-  return getJobs().find((job) => job.id === id)
+export async function getJobById(id: string): Promise<Job | undefined> {
+  const response = await fetch(`/api/jobs/${id}`)
+  if (!response.ok) {
+    if (response.status === 404) return undefined
+    throw new Error('Failed to fetch job')
+  }
+  return await response.json()
 }
 
-export function addJob(job: Omit<Job, "id" | "createdAt">): Job {
-  const jobs = getJobs()
-  const newJob: Job = {
+export async function addJob(job: Omit<Job, "id" | "createdAt">): Promise<Job> {
+  const newJob = {
     ...job,
     id: Date.now().toString(),
-    createdAt: new Date().toISOString(),
   }
-
-  jobs.unshift(newJob)
-  localStorage.setItem(JOBS_KEY, JSON.stringify(jobs))
-  return newJob
+  const response = await fetch('/api/jobs', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(newJob),
+  })
+  if (!response.ok) {
+    throw new Error('Failed to create job')
+  }
+  return await response.json()
 }
 
-export function getApplications(): Application[] {
-  if (typeof window === "undefined") return []
-
-  const stored = localStorage.getItem(APPLICATIONS_KEY)
-  if (!stored) return []
-
-  try {
-    return JSON.parse(stored)
-  } catch {
-    return []
+// Funções para candidaturas
+export async function getApplications(): Promise<Application[]> {
+  const response = await fetch('/api/applications')
+  if (!response.ok) {
+    throw new Error('Failed to fetch applications')
   }
+  return await response.json()
 }
 
-export function addApplication(application: Omit<Application, "id" | "createdAt">): Application {
-  const applications = getApplications()
-  const newApplication: Application = {
+export async function addApplication(application: Omit<Application, "id" | "createdAt">): Promise<Application> {
+  const newApplication = {
     ...application,
     id: Date.now().toString(),
-    createdAt: new Date().toISOString(),
   }
-
-  applications.push(newApplication)
-  localStorage.setItem(APPLICATIONS_KEY, JSON.stringify(applications))
-  return newApplication
+  const response = await fetch('/api/applications', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(newApplication),
+  })
+  if (!response.ok) {
+    throw new Error('Failed to create application')
+  }
+  return await response.json()
 }
 
-export function getUserApplications(userId: string): Application[] {
-  return getApplications().filter((app) => app.userId === userId)
+export async function getUserApplications(userId: string): Promise<Application[]> {
+  const applications = await getApplications()
+  return applications.filter(app => app.userId === userId)
 }
 
-export function hasApplied(userId: string, jobId: string): boolean {
-  return getApplications().some((app) => app.userId === userId && app.jobId === jobId)
+export async function hasApplied(userId: string, jobId: string): Promise<boolean> {
+  const response = await fetch(`/api/applications/check?userId=${userId}&jobId=${jobId}`)
+  if (!response.ok) {
+    throw new Error('Failed to check application')
+  }
+  const data = await response.json()
+  return data.applied
 }
 
-export function getUsers(): User[] {
-  if (typeof window === "undefined") return []
+// Funções para usuários
+export async function getUsers(): Promise<User[]> {
+  const response = await fetch('/api/users')
+  if (!response.ok) {
+    throw new Error('Failed to fetch users')
+  }
+  return await response.json()
+}
 
-  const stored = localStorage.getItem(USERS_KEY)
-  if (!stored) return []
+export async function addUser(user: User): Promise<User> {
+  const response = await fetch('/api/users', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(user),
+  })
+  if (!response.ok) {
+    throw new Error('Failed to create user')
+  }
+  return await response.json()
+}
 
+export async function findUserByEmail(email: string): Promise<User | undefined> {
   try {
-    return JSON.parse(stored)
-  } catch {
-    return []
+    const response = await fetch(`/api/users/email/${encodeURIComponent(email)}`)
+    if (!response.ok) {
+      if (response.status === 404) return undefined
+      throw new Error('Failed to fetch user')
+    }
+    return await response.json()
+  } catch (error) {
+    console.error('Error finding user by email:', error)
+    return undefined
   }
-}
-
-export function addUser(user: User) {
-  const users = getUsers()
-  users.push(user)
-  localStorage.setItem(USERS_KEY, JSON.stringify(users))
-}
-
-export function findUserByEmail(email: string): User | undefined {
-  return getUsers().find((u) => u.email === email)
 }
