@@ -8,7 +8,7 @@ const hasPostgresUrl = !!process.env.POSTGRES_URL;
 let dbInstance: any = null;
 let initPromise: Promise<any> | null = null;
 
-function initDb() {
+async function initDb() {
   if (initPromise) {
     return initPromise;
   }
@@ -82,35 +82,80 @@ function initDb() {
   return initPromise;
 }
 
-// Exporta o banco de dados com lazy loading
-export const db = new Proxy({} as any, {
-  get(target, prop) {
-    // Inicializar o banco se ainda não foi inicializado
-    if (!dbInstance) {
-      // Iniciar inicialização (não esperar aqui, será esperado quando o método for chamado)
-      initDb();
-    }
-    
-    // Se já temos a instância, retornar diretamente
-    if (dbInstance) {
-      const value = (dbInstance as any)[prop];
-      if (typeof value === 'function') {
-        return value.bind(dbInstance);
-      }
-      return value;
-    }
-    
-    // Caso contrário, retornar uma função que espera a inicialização
-    return async (...args: any[]) => {
-      const db = await initDb();
-      const method = (db as any)[prop];
-      if (typeof method === 'function') {
-        return method.apply(db, args);
-      }
-      return method;
-    };
+// Função para garantir que o banco está inicializado
+export async function ensureDbInitialized() {
+  if (!dbInstance) {
+    await initDb();
   }
-});
+  return dbInstance;
+}
+
+// Para SQLite, podemos inicializar de forma síncrona
+function initDbSync() {
+  if (dbInstance) {
+    return dbInstance;
+  }
+
+  try {
+    const { drizzle } = require('drizzle-orm/better-sqlite3');
+    const Database = require('better-sqlite3');
+    const path = require('path');
+    const fs = require('fs');
+    
+    const dbPath = './lib/db/workhubb.db';
+    const absolutePath = path.resolve(process.cwd(), dbPath);
+    
+    const dbDir = path.dirname(absolutePath);
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+    }
+    
+    const sqliteInstance = new Database(absolutePath);
+    dbInstance = drizzle(sqliteInstance, { schema });
+    return dbInstance;
+  } catch (error: any) {
+    console.error('Error initializing SQLite synchronously:', error);
+    throw error;
+  }
+}
+
+// Exporta o banco de dados
+// Para SQLite (desenvolvimento), inicializa de forma síncrona
+// Para Postgres (produção), precisa ser inicializado de forma assíncrona
+export const db = (() => {
+  // Se for SQLite, inicializar agora
+  if (!isVercel || !hasPostgresUrl) {
+    try {
+      return initDbSync();
+    } catch (error) {
+      console.error('Failed to initialize SQLite:', error);
+      // Retornar um objeto proxy que vai tentar inicializar quando usado
+    }
+  }
+  
+  // Para Postgres ou se SQLite falhou, retornar um proxy
+  return new Proxy({} as any, {
+    get(target, prop) {
+      if (dbInstance) {
+        const value = (dbInstance as any)[prop];
+        if (typeof value === 'function') {
+          return value.bind(dbInstance);
+        }
+        return value;
+      }
+      
+      // Se não temos instância, retornar uma função que inicializa e chama
+      return async function(...args: any[]) {
+        const db = await ensureDbInitialized();
+        const method = (db as any)[prop];
+        if (typeof method === 'function') {
+          return method.apply(db, args);
+        }
+        return method;
+      };
+    }
+  });
+})();
 
 // Exporta o schema
 export * from './schema';

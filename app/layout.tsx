@@ -2,7 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { Navbar } from "@/components/navbar"
+import NavbarWrapper from "@/components/navbar-wrapper"
 import { Footer } from "@/components/footer"
 
 const inter = Inter({
@@ -24,7 +24,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={inter.variable}>
       <body className="antialiased">
-        <Navbar />
+        <NavbarWrapper />
         <main className="min-h-screen">{children}</main>
         <Footer />
       </body>

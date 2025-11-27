@@ -1,12 +1,19 @@
-import { db } from './index';
+import { db, ensureDbInitialized } from './index';
 import { users, jobs, applications, experiences } from './schema';
 import { eq, desc, and } from 'drizzle-orm';
 import type { User, Job, Application, NewUser, NewJob, NewApplication, Experience, NewExperience } from './schema';
 
+// Função auxiliar para garantir que o banco está inicializado antes de usar
+async function getDb() {
+  await ensureDbInitialized();
+  return db;
+}
+
 // Funções para usuários
 export async function getAllUsers(): Promise<User[]> {
   try {
-    return await db.select().from(users).orderBy(desc(users.createdAt));
+    const database = await getDb();
+    return await database.select().from(users).orderBy(desc(users.createdAt));
   } catch (error: any) {
     console.error('Error in getAllUsers:', error);
     throw new Error(error?.message || 'Erro ao buscar usuários');
@@ -15,7 +22,8 @@ export async function getAllUsers(): Promise<User[]> {
 
 export async function getUserById(id: string): Promise<User | undefined> {
   try {
-    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    const database = await getDb();
+    const result = await database.select().from(users).where(eq(users.id, id)).limit(1);
     return result[0];
   } catch (error: any) {
     console.error('Error in getUserById:', error);
@@ -25,7 +33,8 @@ export async function getUserById(id: string): Promise<User | undefined> {
 
 export async function getUserByEmail(email: string): Promise<User | undefined> {
   try {
-    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    const database = await getDb();
+    const result = await database.select().from(users).where(eq(users.email, email)).limit(1);
     return result[0];
   } catch (error: any) {
     console.error('Error in getUserByEmail:', error);
@@ -74,22 +83,9 @@ export async function createUser(user: NewUser): Promise<User> {
       hasStack: !!userData.stack,
     });
     
-    // Verificar se o banco está disponível tentando acessá-lo
-    try {
-      // Testar se o banco está acessível - usar uma query simples
-      await db.select().from(users).limit(0);
-      console.log('Database access test passed');
-    } catch (testError: any) {
-      console.error('Database access test failed:', testError);
-      console.error('Test error details:', {
-        message: testError?.message,
-        code: testError?.code,
-        stack: testError?.stack
-      });
-      throw new Error('Banco de dados não está disponível. Verifique a configuração.');
-    }
+    const database = await getDb();
     
-    const result = await db.insert(users).values(userData).returning();
+    const result = await database.insert(users).values(userData).returning();
     
     if (!result || result.length === 0) {
       throw new Error('Falha ao criar usuário: nenhum resultado retornado');
@@ -127,13 +123,15 @@ export async function createUser(user: NewUser): Promise<User> {
 }
 
 export async function updateUser(id: string, user: Partial<NewUser>): Promise<User | undefined> {
-  const result = await db.update(users).set(user).where(eq(users.id, id)).returning();
+  const database = await getDb();
+  const result = await database.update(users).set(user).where(eq(users.id, id)).returning();
   return result[0];
 }
 
 // Funções para vagas
 export async function getAllJobs(): Promise<Job[]> {
-  const dbJobs = await db.select().from(jobs).orderBy(desc(jobs.createdAt));
+  const database = await getDb();
+  const dbJobs = await database.select().from(jobs).orderBy(desc(jobs.createdAt));
   return dbJobs.map(job => ({
     ...job,
     requirements: JSON.parse(job.requirements as string)
@@ -141,7 +139,8 @@ export async function getAllJobs(): Promise<Job[]> {
 }
 
 export async function getJobById(id: string): Promise<Job | undefined> {
-  const result = await db.select().from(jobs).where(eq(jobs.id, id)).limit(1);
+  const database = await getDb();
+  const result = await database.select().from(jobs).where(eq(jobs.id, id)).limit(1);
   if (result[0]) {
     return {
       ...result[0],
@@ -152,7 +151,8 @@ export async function getJobById(id: string): Promise<Job | undefined> {
 }
 
 export async function getJobsByAuthor(authorId: string): Promise<Job[]> {
-  const dbJobs = await db.select().from(jobs).where(eq(jobs.authorId, authorId)).orderBy(desc(jobs.createdAt));
+  const database = await getDb();
+  const dbJobs = await database.select().from(jobs).where(eq(jobs.authorId, authorId)).orderBy(desc(jobs.createdAt));
   return dbJobs.map(job => ({
     ...job,
     requirements: JSON.parse(job.requirements as string)
@@ -160,11 +160,12 @@ export async function getJobsByAuthor(authorId: string): Promise<Job[]> {
 }
 
 export async function createJob(job: NewJob): Promise<Job> {
+  const database = await getDb();
   const jobToInsert = {
     ...job,
     requirements: JSON.stringify(job.requirements)
   };
-  const result = await db.insert(jobs).values(jobToInsert).returning();
+  const result = await database.insert(jobs).values(jobToInsert).returning();
   return {
     ...result[0],
     requirements: job.requirements
@@ -172,11 +173,12 @@ export async function createJob(job: NewJob): Promise<Job> {
 }
 
 export async function updateJob(id: string, job: Partial<NewJob>): Promise<Job | undefined> {
+  const database = await getDb();
   const jobToUpdate = {
     ...job,
     requirements: job.requirements ? JSON.stringify(job.requirements) : undefined
   };
-  const result = await db.update(jobs).set(jobToUpdate).where(eq(jobs.id, id)).returning();
+  const result = await database.update(jobs).set(jobToUpdate).where(eq(jobs.id, id)).returning();
   if (result[0]) {
     return {
       ...result[0],
@@ -187,35 +189,42 @@ export async function updateJob(id: string, job: Partial<NewJob>): Promise<Job |
 }
 
 export async function deleteJob(id: string): Promise<boolean> {
-  const result = await db.delete(jobs).where(eq(jobs.id, id));
+  const database = await getDb();
+  const result = await database.delete(jobs).where(eq(jobs.id, id));
   return result.changes > 0;
 }
 
 // Funções para candidaturas
 export async function getAllApplications(): Promise<Application[]> {
-  return await db.select().from(applications).orderBy(desc(applications.createdAt));
+  const database = await getDb();
+  return await database.select().from(applications).orderBy(desc(applications.createdAt));
 }
 
 export async function getApplicationById(id: string): Promise<Application | undefined> {
-  const result = await db.select().from(applications).where(eq(applications.id, id)).limit(1);
+  const database = await getDb();
+  const result = await database.select().from(applications).where(eq(applications.id, id)).limit(1);
   return result[0];
 }
 
 export async function getUserApplications(userId: string): Promise<Application[]> {
-  return await db.select().from(applications).where(eq(applications.userId, userId)).orderBy(desc(applications.createdAt));
+  const database = await getDb();
+  return await database.select().from(applications).where(eq(applications.userId, userId)).orderBy(desc(applications.createdAt));
 }
 
 export async function getJobApplications(jobId: string): Promise<Application[]> {
-  return await db.select().from(applications).where(eq(applications.jobId, jobId)).orderBy(desc(applications.createdAt));
+  const database = await getDb();
+  return await database.select().from(applications).where(eq(applications.jobId, jobId)).orderBy(desc(applications.createdAt));
 }
 
 export async function createApplication(application: NewApplication): Promise<Application> {
-  const result = await db.insert(applications).values(application).returning();
+  const database = await getDb();
+  const result = await database.insert(applications).values(application).returning();
   return result[0];
 }
 
 export async function hasApplied(userId: string, jobId: string): Promise<boolean> {
-  const result = await db.select().from(applications).where(
+  const database = await getDb();
+  const result = await database.select().from(applications).where(
     and(
       eq(applications.userId, userId),
       eq(applications.jobId, jobId)
@@ -226,7 +235,8 @@ export async function hasApplied(userId: string, jobId: string): Promise<boolean
 
 // Função para buscar candidaturas com informações do usuário e vaga
 export async function getApplicationsWithDetails() {
-  return await db
+  const database = await getDb();
+  return await database
     .select({
       application: applications,
       user: users,
@@ -240,29 +250,35 @@ export async function getApplicationsWithDetails() {
 
 // Funções para experiências profissionais
 export async function getAllExperiences(): Promise<Experience[]> {
-  return await db.select().from(experiences).orderBy(desc(experiences.startDate));
+  const database = await getDb();
+  return await database.select().from(experiences).orderBy(desc(experiences.startDate));
 }
 
 export async function getExperienceById(id: string): Promise<Experience | undefined> {
-  const result = await db.select().from(experiences).where(eq(experiences.id, id)).limit(1);
+  const database = await getDb();
+  const result = await database.select().from(experiences).where(eq(experiences.id, id)).limit(1);
   return result[0];
 }
 
 export async function getUserExperiences(userId: string): Promise<Experience[]> {
-  return await db.select().from(experiences).where(eq(experiences.userId, userId)).orderBy(desc(experiences.startDate));
+  const database = await getDb();
+  return await database.select().from(experiences).where(eq(experiences.userId, userId)).orderBy(desc(experiences.startDate));
 }
 
 export async function createExperience(experience: NewExperience): Promise<Experience> {
-  const result = await db.insert(experiences).values(experience).returning();
+  const database = await getDb();
+  const result = await database.insert(experiences).values(experience).returning();
   return result[0];
 }
 
 export async function updateExperience(id: string, experience: Partial<NewExperience>): Promise<Experience | undefined> {
-  const result = await db.update(experiences).set(experience).where(eq(experiences.id, id)).returning();
+  const database = await getDb();
+  const result = await database.update(experiences).set(experience).where(eq(experiences.id, id)).returning();
   return result[0];
 }
 
 export async function deleteExperience(id: string): Promise<boolean> {
-  const result = await db.delete(experiences).where(eq(experiences.id, id));
+  const database = await getDb();
+  const result = await database.delete(experiences).where(eq(experiences.id, id));
   return result.changes > 0;
 }
