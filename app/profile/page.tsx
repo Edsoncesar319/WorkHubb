@@ -309,18 +309,41 @@ export default function ProfilePage() {
 
   const uploadBase64ToBlob = async (base64String: string): Promise<string> => {
     try {
-      // Converter base64 para Blob
-      const response = await fetch(base64String)
-      const blob = await response.blob()
-      
-      // Criar File a partir do Blob
-      const file = new File([blob], 'profile-photo.jpg', { type: blob.type })
-      
-      // Fazer upload para Vercel Blob
-      return await uploadToBlob(file)
+      // Opção 1: Enviar base64 diretamente via JSON (mais eficiente)
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          base64: base64String,
+          fileName: 'profile-photo.jpg'
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Erro ao fazer upload da imagem')
+      }
+
+      const data = await response.json()
+      console.log('Base64 upload successful:', {
+        url: data.url,
+        pathname: data.pathname
+      })
+      return data.url
     } catch (error: any) {
       console.error('Error uploading base64 to blob:', error)
-      throw error
+      // Fallback: tentar método antigo (converter para File primeiro)
+      try {
+        const response = await fetch(base64String)
+        const blob = await response.blob()
+        const file = new File([blob], 'profile-photo.jpg', { type: blob.type })
+        return await uploadToBlob(file)
+      } catch (fallbackError: any) {
+        console.error('Fallback upload also failed:', fallbackError)
+        throw error // Lançar o erro original
+      }
     }
   }
 
