@@ -5,17 +5,37 @@ import type { User, Job, Application, NewUser, NewJob, NewApplication, Experienc
 
 // Funções para usuários
 export async function getAllUsers(): Promise<User[]> {
-  return await db.select().from(users).orderBy(desc(users.createdAt));
+  try {
+    return await db.select().from(users).orderBy(desc(users.createdAt));
+  } catch (error: any) {
+    console.error('Error in getAllUsers:', error);
+    throw new Error(error?.message || 'Erro ao buscar usuários');
+  }
 }
 
 export async function getUserById(id: string): Promise<User | undefined> {
-  const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
-  return result[0];
+  try {
+    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    return result[0];
+  } catch (error: any) {
+    console.error('Error in getUserById:', error);
+    throw new Error(error?.message || 'Erro ao buscar usuário');
+  }
 }
 
 export async function getUserByEmail(email: string): Promise<User | undefined> {
-  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
-  return result[0];
+  try {
+    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    return result[0];
+  } catch (error: any) {
+    console.error('Error in getUserByEmail:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      code: error?.code,
+      email: email
+    });
+    throw new Error(error?.message || 'Erro ao buscar usuário por email');
+  }
 }
 
 export async function createUser(user: NewUser): Promise<User> {

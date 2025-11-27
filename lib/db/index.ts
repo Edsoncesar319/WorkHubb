@@ -107,13 +107,35 @@ let dbInitialized = false;
 function ensureDbInitialized() {
   if (!dbInitialized) {
     try {
-      const testDb = getDb();
-      if (testDb) {
-        dbInitialized = true;
-        console.log('Database module initialized successfully');
+      console.log('Ensuring database is initialized...');
+      
+      // Primeiro, garantir que o SQLite está inicializado
+      if (!sqliteInstance) {
+        console.log('SQLite instance not found, initializing...');
+        const sqlite = getDatabase();
+        if (!sqlite) {
+          throw new Error('Failed to create SQLite instance');
+        }
       }
+      
+      // Depois, garantir que o Drizzle está inicializado
+      if (!dbInstance) {
+        console.log('Drizzle instance not found, initializing...');
+        const drizzle = getDb();
+        if (!drizzle) {
+          throw new Error('Failed to create Drizzle instance');
+        }
+      }
+      
+      dbInitialized = true;
+      console.log('Database module initialized successfully');
     } catch (error: any) {
       console.error('Failed to initialize database module:', error);
+      console.error('Initialization error details:', {
+        message: error?.message,
+        code: error?.code,
+        stack: error?.stack
+      });
       throw error;
     }
   }

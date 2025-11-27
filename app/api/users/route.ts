@@ -3,11 +3,26 @@ import { getAllUsers, createUser } from '@/lib/db/queries';
 
 export async function GET() {
   try {
+    console.log('Fetching all users...');
     const users = await getAllUsers();
+    console.log(`Found ${users.length} users`);
     return NextResponse.json(users);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching users:', error);
-    return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
+    console.error('Error details:', {
+      message: error?.message,
+      code: error?.code,
+      stack: error?.stack
+    });
+    
+    const errorMessage = error?.message || 'Failed to fetch users';
+    return NextResponse.json({ 
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? {
+        message: error?.message,
+        code: error?.code
+      } : undefined
+    }, { status: 500 });
   }
 }
 
