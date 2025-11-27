@@ -100,10 +100,42 @@ function getDb() {
   }
 }
 
+// Inicializar o banco de dados uma vez no carregamento do módulo
+// Isso garante que o banco esteja disponível quando necessário
+let dbInitialized = false;
+
+function ensureDbInitialized() {
+  if (!dbInitialized) {
+    try {
+      const testDb = getDb();
+      if (testDb) {
+        dbInitialized = true;
+        console.log('Database module initialized successfully');
+      }
+    } catch (error: any) {
+      console.error('Failed to initialize database module:', error);
+      throw error;
+    }
+  }
+}
+
+// Tentar inicializar o banco quando o módulo é carregado (apenas em runtime, não durante build)
+if (typeof window === 'undefined' && process.env.NODE_ENV !== 'test') {
+  try {
+    ensureDbInitialized();
+  } catch (error) {
+    // Ignorar erros durante o build
+    console.warn('Database initialization skipped (likely during build)');
+  }
+}
+
 // Exporta a função getDb ao invés de db direto para lazy loading
 export const db = new Proxy({} as ReturnType<typeof drizzle>, {
   get(target, prop) {
     try {
+      // Garantir que o banco está inicializado antes de acessar
+      ensureDbInitialized();
+      
       const db = getDb();
       if (!db) {
         throw new Error('Database not available. Please configure a database for production (e.g., Vercel Postgres).');
@@ -111,6 +143,11 @@ export const db = new Proxy({} as ReturnType<typeof drizzle>, {
       return (db as any)[prop];
     } catch (error: any) {
       console.error('Error accessing database property:', prop, error);
+      console.error('Error details:', {
+        message: error?.message,
+        code: error?.code,
+        stack: error?.stack
+      });
       throw error;
     }
   }
