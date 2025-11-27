@@ -39,6 +39,20 @@ export const applications = sqliteTable('applications', {
   createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 
+// Tabela de experiências profissionais
+export const experiences = sqliteTable('experiences', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  title: text('title').notNull(),
+  company: text('company').notNull(),
+  location: text('location'),
+  startDate: text('start_date').notNull(),
+  endDate: text('end_date'),
+  current: integer('current', { mode: 'boolean' }).default(false).notNull(),
+  description: text('description'),
+  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
 // Tipos TypeScript derivados dos schemas
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -46,3 +60,5 @@ export type Job = Omit<typeof jobs.$inferSelect, 'requirements'> & { requirement
 export type NewJob = Omit<typeof jobs.$inferInsert, 'requirements'> & { requirements: string[] };
 export type Application = typeof applications.$inferSelect;
 export type NewApplication = typeof applications.$inferInsert;
+export type Experience = typeof experiences.$inferSelect;
+export type NewExperience = typeof experiences.$inferInsert;

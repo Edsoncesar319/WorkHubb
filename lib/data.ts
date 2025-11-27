@@ -1,4 +1,4 @@
-import type { Job, Application, User } from "./types"
+import type { Job, Application, User, Experience } from "./types"
 
 // Funções para vagas
 export async function getJobs(): Promise<Job[]> {
@@ -147,5 +147,85 @@ export async function updateUser(id: string, user: Partial<User>): Promise<User 
   } catch (error) {
     console.error('Error updating user:', error)
     return undefined
+  }
+}
+
+// Funções para experiências profissionais
+export async function getExperiences(): Promise<Experience[]> {
+  const response = await fetch('/api/experiences')
+  if (!response.ok) {
+    throw new Error('Failed to fetch experiences')
+  }
+  return await response.json()
+}
+
+export async function getExperienceById(id: string): Promise<Experience | undefined> {
+  const response = await fetch(`/api/experiences/${id}`)
+  if (!response.ok) {
+    if (response.status === 404) return undefined
+    throw new Error('Failed to fetch experience')
+  }
+  return await response.json()
+}
+
+export async function getUserExperiences(userId: string): Promise<Experience[]> {
+  const response = await fetch(`/api/experiences/user/${userId}`)
+  if (!response.ok) {
+    throw new Error('Failed to fetch user experiences')
+  }
+  return await response.json()
+}
+
+export async function addExperience(experience: Omit<Experience, "id" | "createdAt">): Promise<Experience> {
+  const newExperience = {
+    ...experience,
+    id: Date.now().toString(),
+  }
+  const response = await fetch('/api/experiences', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(newExperience),
+  })
+  if (!response.ok) {
+    throw new Error('Failed to create experience')
+  }
+  return await response.json()
+}
+
+export async function updateExperience(id: string, experience: Partial<Experience>): Promise<Experience | undefined> {
+  try {
+    const response = await fetch(`/api/experiences/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(experience),
+    })
+    if (!response.ok) {
+      if (response.status === 404) return undefined
+      throw new Error('Failed to update experience')
+    }
+    return await response.json()
+  } catch (error) {
+    console.error('Error updating experience:', error)
+    return undefined
+  }
+}
+
+export async function deleteExperience(id: string): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/experiences/${id}`, {
+      method: 'DELETE',
+    })
+    if (!response.ok) {
+      if (response.status === 404) return false
+      throw new Error('Failed to delete experience')
+    }
+    return true
+  } catch (error) {
+    console.error('Error deleting experience:', error)
+    return false
   }
 }

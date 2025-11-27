@@ -34,3 +34,16 @@ export interface Application {
   message: string
   createdAt: string
 }
+
+export interface Experience {
+  id: string
+  userId: string
+  title: string
+  company: string
+  location?: string
+  startDate: string
+  endDate?: string
+  current: boolean
+  description?: string
+  createdAt: string
+}

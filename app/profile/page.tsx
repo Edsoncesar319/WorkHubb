@@ -13,10 +13,10 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { getCurrentUser, setCurrentUser } from "@/lib/auth"
-import { getUserApplications, getJobById, updateUser, addUser, getJobsByAuthor, getJobApplications } from "@/lib/data"
+import { getUserApplications, getJobById, updateUser, addUser, getJobsByAuthor, getJobApplications, getUserExperiences, addExperience, updateExperience, deleteExperience } from "@/lib/data"
 import { useDatabaseSync } from "@/hooks/use-database-sync"
 import { ImageCropper } from "@/components/image-cropper"
-import type { User, Application, Job } from "@/lib/types"
+import type { User, Application, Job, Experience } from "@/lib/types"
 import { 
   Github, 
   Linkedin, 
@@ -47,7 +47,10 @@ export default function ProfilePage() {
   const [applications, setApplications] = useState<Array<Application & { job?: Job }>>([])
   const [companyJobs, setCompanyJobs] = useState<Job[]>([])
   const [jobApplications, setJobApplications] = useState<Record<string, Array<{ application: Application; user: User | null }>>>({})
+  const [experiences, setExperiences] = useState<Experience[]>([])
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isExperienceModalOpen, setIsExperienceModalOpen] = useState(false)
+  const [editingExperience, setEditingExperience] = useState<Experience | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [editForm, setEditForm] = useState({
     name: "",
@@ -92,6 +95,10 @@ export default function ProfilePage() {
       }))
           )
       setApplications(appsWithJobs)
+          
+          // Carregar experiências profissionais
+          const userExperiences = await getUserExperiences(currentUser.id)
+          setExperiences(userExperiences)
         } catch (error) {
           console.error('Error loading applications:', error)
         }
@@ -253,6 +260,86 @@ export default function ProfilePage() {
     })
   }
 
+  const [experienceForm, setExperienceForm] = useState({
+    title: "",
+    company: "",
+    location: "",
+    startDate: "",
+    endDate: "",
+    current: false,
+    description: ""
+  })
+
+  const handleAddExperience = () => {
+    setEditingExperience(null)
+    setExperienceForm({
+      title: "",
+      company: "",
+      location: "",
+      startDate: "",
+      endDate: "",
+      current: false,
+      description: ""
+    })
+    setIsExperienceModalOpen(true)
+  }
+
+  const handleSaveExperience = async () => {
+    if (!user) return
+
+    setIsLoading(true)
+    try {
+      if (editingExperience) {
+        // Atualizar experiência existente
+        const updated = await updateExperience(editingExperience.id, {
+          title: experienceForm.title,
+          company: experienceForm.company,
+          location: experienceForm.location || undefined,
+          startDate: experienceForm.startDate,
+          endDate: experienceForm.current ? undefined : (experienceForm.endDate || undefined),
+          current: experienceForm.current,
+          description: experienceForm.description || undefined
+        })
+        if (updated) {
+          setExperiences(experiences.map(e => e.id === updated.id ? updated : e))
+          setIsExperienceModalOpen(false)
+        }
+      } else {
+        // Criar nova experiência
+        const newExp = await addExperience({
+          userId: user.id,
+          title: experienceForm.title,
+          company: experienceForm.company,
+          location: experienceForm.location || undefined,
+          startDate: experienceForm.startDate,
+          endDate: experienceForm.current ? undefined : (experienceForm.endDate || undefined),
+          current: experienceForm.current,
+          description: experienceForm.description || undefined
+        })
+        setExperiences([...experiences, newExp])
+        setIsExperienceModalOpen(false)
+      }
+    } catch (error) {
+      console.error("Erro ao salvar experiência:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleEditExperience = (exp: Experience) => {
+    setEditingExperience(exp)
+    setExperienceForm({
+      title: exp.title,
+      company: exp.company,
+      location: exp.location || "",
+      startDate: exp.startDate,
+      endDate: exp.endDate || "",
+      current: exp.current,
+      description: exp.description || ""
+    })
+    setIsExperienceModalOpen(true)
+  }
+
   if (!user) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -402,21 +489,84 @@ export default function ProfilePage() {
             )}
 
             {/* Experience Section */}
-            <Card className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Briefcase className="w-5 h-5 text-primary" />
-                <h2 className="text-xl font-bold">Experiência</h2>
-              </div>
-              
-              <div className="text-center py-8">
-                <Briefcase className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">Adicione sua experiência profissional</p>
-                <Button variant="outline" size="sm" onClick={handleEditProfile}>
-                  <Edit className="w-4 h-4 mr-2" />
-                  Adicionar Experiência
-                </Button>
-              </div>
-            </Card>
+            {user.type === "professional" && (
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="w-5 h-5 text-primary" />
+                    <h2 className="text-xl font-bold">Experiência Profissional</h2>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={handleAddExperience}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Adicionar Experiência
+                  </Button>
+                </div>
+                
+                {experiences.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Briefcase className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground mb-4">Adicione sua experiência profissional</p>
+                    <Button variant="outline" size="sm" onClick={handleAddExperience}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Adicionar Experiência
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {experiences.map((exp) => (
+                      <Card key={exp.id} className="p-4 border-l-4 border-l-primary">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-lg mb-1">{exp.title}</h3>
+                            <p className="text-muted-foreground font-medium mb-2">{exp.company}</p>
+                            {exp.location && (
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                                <MapPin className="w-4 h-4" />
+                                <span>{exp.location}</span>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                              <Calendar className="w-4 h-4" />
+                              <span>
+                                {new Date(exp.startDate).toLocaleDateString("pt-BR", { month: "short", year: "numeric" })} - {
+                                  exp.current ? "Atual" : exp.endDate ? new Date(exp.endDate).toLocaleDateString("pt-BR", { month: "short", year: "numeric" }) : "N/A"
+                                }
+                              </span>
+                            </div>
+                            {exp.description && (
+                              <p className="text-sm text-muted-foreground mt-2">{exp.description}</p>
+                            )}
+                          </div>
+                          <div className="flex gap-2 ml-4">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditExperience(exp)}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={async () => {
+                                if (confirm("Tem certeza que deseja excluir esta experiência?")) {
+                                  const deleted = await deleteExperience(exp.id)
+                                  if (deleted) {
+                                    setExperiences(experiences.filter(e => e.id !== exp.id))
+                                  }
+                                }
+                              }}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )}
           </div>
 
           {/* Sidebar */}
@@ -1060,6 +1210,127 @@ export default function ProfilePage() {
                   disabled={isLoading || !editForm.name?.trim()}
                 >
                   {isLoading ? "Salvando..." : "Salvar Alterações"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Experience Modal */}
+        <Dialog open={isExperienceModalOpen} onOpenChange={setIsExperienceModalOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {editingExperience ? "Editar Experiência" : "Adicionar Experiência"}
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              {/* Title */}
+              <div className="space-y-2">
+                <Label htmlFor="exp-title">Cargo *</Label>
+                <Input
+                  id="exp-title"
+                  value={experienceForm.title}
+                  onChange={(e) => setExperienceForm({ ...experienceForm, title: e.target.value })}
+                  placeholder="Ex: Desenvolvedor Full Stack"
+                  required
+                />
+              </div>
+
+              {/* Company */}
+              <div className="space-y-2">
+                <Label htmlFor="exp-company">Empresa *</Label>
+                <Input
+                  id="exp-company"
+                  value={experienceForm.company}
+                  onChange={(e) => setExperienceForm({ ...experienceForm, company: e.target.value })}
+                  placeholder="Ex: TechCorp"
+                  required
+                />
+              </div>
+
+              {/* Location */}
+              <div className="space-y-2">
+                <Label htmlFor="exp-location">Localização</Label>
+                <Input
+                  id="exp-location"
+                  value={experienceForm.location}
+                  onChange={(e) => setExperienceForm({ ...experienceForm, location: e.target.value })}
+                  placeholder="Ex: São Paulo, SP"
+                />
+              </div>
+
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="exp-start-date">Data de Início *</Label>
+                  <Input
+                    id="exp-start-date"
+                    type="month"
+                    value={experienceForm.startDate}
+                    onChange={(e) => setExperienceForm({ ...experienceForm, startDate: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="exp-end-date">Data de Término</Label>
+                  <Input
+                    id="exp-end-date"
+                    type="month"
+                    value={experienceForm.endDate}
+                    onChange={(e) => setExperienceForm({ ...experienceForm, endDate: e.target.value })}
+                    disabled={experienceForm.current}
+                  />
+                </div>
+              </div>
+
+              {/* Current Job */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="exp-current"
+                  checked={experienceForm.current}
+                  onChange={(e) => {
+                    setExperienceForm({ 
+                      ...experienceForm, 
+                      current: e.target.checked,
+                      endDate: e.target.checked ? "" : experienceForm.endDate
+                    })
+                  }}
+                  className="w-4 h-4"
+                />
+                <Label htmlFor="exp-current" className="cursor-pointer">
+                  Trabalho Atual
+                </Label>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-2">
+                <Label htmlFor="exp-description">Descrição</Label>
+                <Textarea
+                  id="exp-description"
+                  value={experienceForm.description}
+                  onChange={(e) => setExperienceForm({ ...experienceForm, description: e.target.value })}
+                  placeholder="Descreva suas responsabilidades e conquistas..."
+                  rows={4}
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsExperienceModalOpen(false)}
+                  disabled={isLoading}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleSaveExperience}
+                  disabled={isLoading || !experienceForm.title?.trim() || !experienceForm.company?.trim() || !experienceForm.startDate}
+                >
+                  {isLoading ? "Salvando..." : editingExperience ? "Atualizar" : "Adicionar"}
                 </Button>
               </div>
             </div>

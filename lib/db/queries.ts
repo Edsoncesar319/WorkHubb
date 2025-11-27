@@ -1,7 +1,7 @@
 import { db } from './index';
-import { users, jobs, applications } from './schema';
+import { users, jobs, applications, experiences } from './schema';
 import { eq, desc, and } from 'drizzle-orm';
-import type { User, Job, Application, NewUser, NewJob, NewApplication } from './schema';
+import type { User, Job, Application, NewUser, NewJob, NewApplication, Experience, NewExperience } from './schema';
 
 // Funções para usuários
 export async function getAllUsers(): Promise<User[]> {
@@ -133,4 +133,33 @@ export async function getApplicationsWithDetails() {
     .leftJoin(users, eq(applications.userId, users.id))
     .leftJoin(jobs, eq(applications.jobId, jobs.id))
     .orderBy(desc(applications.createdAt));
+}
+
+// Funções para experiências profissionais
+export async function getAllExperiences(): Promise<Experience[]> {
+  return await db.select().from(experiences).orderBy(desc(experiences.startDate));
+}
+
+export async function getExperienceById(id: string): Promise<Experience | undefined> {
+  const result = await db.select().from(experiences).where(eq(experiences.id, id)).limit(1);
+  return result[0];
+}
+
+export async function getUserExperiences(userId: string): Promise<Experience[]> {
+  return await db.select().from(experiences).where(eq(experiences.userId, userId)).orderBy(desc(experiences.startDate));
+}
+
+export async function createExperience(experience: NewExperience): Promise<Experience> {
+  const result = await db.insert(experiences).values(experience).returning();
+  return result[0];
+}
+
+export async function updateExperience(id: string, experience: Partial<NewExperience>): Promise<Experience | undefined> {
+  const result = await db.update(experiences).set(experience).where(eq(experiences.id, id)).returning();
+  return result[0];
+}
+
+export async function deleteExperience(id: string): Promise<boolean> {
+  const result = await db.delete(experiences).where(eq(experiences.id, id));
+  return result.changes > 0;
 }
