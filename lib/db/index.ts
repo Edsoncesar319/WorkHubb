@@ -12,19 +12,37 @@ function getDatabase() {
 
   try {
     const Database = require('better-sqlite3');
+    const path = require('path');
+    const fs = require('fs');
     
     // Durante o build na Vercel, usar banco em memória
     if (process.env.VERCEL || process.env.NEXT_PHASE === 'phase-production-build') {
       sqliteInstance = new Database(':memory:');
+      console.log('Using in-memory database (build mode)');
     } else {
       // Em desenvolvimento/local, usar arquivo SQLite
-      sqliteInstance = new Database('./lib/db/workhubb.db');
+      const dbPath = path.join(process.cwd(), 'lib', 'db', 'workhubb.db');
+      console.log('Database path:', dbPath);
+      
+      // Verificar se o diretório existe
+      const dbDir = path.dirname(dbPath);
+      if (!fs.existsSync(dbDir)) {
+        fs.mkdirSync(dbDir, { recursive: true });
+      }
+      
+      sqliteInstance = new Database(dbPath);
+      console.log('Database initialized successfully');
     }
     
     return sqliteInstance;
-  } catch (error) {
+  } catch (error: any) {
     // Se better-sqlite3 não estiver disponível (durante build), criar um mock
-    console.warn('better-sqlite3 not available, database operations will fail at runtime');
+    console.error('Error initializing database:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      code: error?.code,
+      stack: error?.stack
+    });
     return null;
   }
 }

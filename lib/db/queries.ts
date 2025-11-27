@@ -20,15 +20,29 @@ export async function getUserByEmail(email: string): Promise<User | undefined> {
 
 export async function createUser(user: NewUser): Promise<User> {
   try {
+    // Validar dados obrigatórios
+    if (!user.id || !user.name || !user.email || !user.type) {
+      throw new Error('Campos obrigatórios faltando: id, name, email, type');
+    }
+
+    // Validar tipo de usuário
+    if (user.type !== 'professional' && user.type !== 'company') {
+      throw new Error('Tipo de usuário inválido. Deve ser "professional" ou "company"');
+    }
+
     // Garantir que campos opcionais sejam null ao invés de undefined
     const userData = {
-      ...user,
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      type: user.type,
       bio: user.bio ?? null,
       stack: user.stack ?? null,
       github: user.github ?? null,
       linkedin: user.linkedin ?? null,
       company: user.company ?? null,
       profilePhoto: user.profilePhoto ?? null,
+      createdAt: user.createdAt || new Date().toISOString(),
     };
     
     console.log('Creating user with data:', {
@@ -40,7 +54,17 @@ export async function createUser(user: NewUser): Promise<User> {
       hasStack: !!userData.stack,
     });
     
+    // Verificar se o banco está disponível
+    if (!db) {
+      throw new Error('Banco de dados não está disponível');
+    }
+    
     const result = await db.insert(users).values(userData).returning();
+    
+    if (!result || result.length === 0) {
+      throw new Error('Falha ao criar usuário: nenhum resultado retornado');
+    }
+    
     console.log('User created successfully:', result[0]?.id);
     return result[0];
   } catch (error: any) {
@@ -61,6 +85,11 @@ export async function createUser(user: NewUser): Promise<User> {
     // Se for erro de constraint, tentar identificar qual campo
     if (error?.message?.includes('UNIQUE constraint')) {
       throw new Error('Este email já está cadastrado');
+    }
+    
+    // Se for erro de banco não disponível
+    if (error?.message?.includes('Database not available')) {
+      throw new Error('Banco de dados não está disponível. Verifique a configuração.');
     }
     
     throw new Error(error?.message || 'Erro ao criar usuário no banco de dados');
