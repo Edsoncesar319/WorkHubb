@@ -63,9 +63,11 @@ export default function RegisterPage() {
       await addUser(newUser)
       setCurrentUser(newUser)
       router.push(userType === "company" ? "/dashboard" : "/jobs")
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating user:', error)
-      setError("Erro ao criar conta. Tente novamente.")
+      // Mostrar mensagem de erro mais específica
+      const errorMessage = error?.message || "Erro ao criar conta. Tente novamente."
+      setError(errorMessage)
     }
   }
 

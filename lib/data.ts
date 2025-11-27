@@ -103,19 +103,33 @@ export async function getUsers(): Promise<User[]> {
 }
 
 export async function addUser(user: User): Promise<User> {
-  const response = await fetch('/api/users', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(user),
-  })
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    const errorMessage = errorData.error || 'Failed to create user'
-    throw new Error(errorMessage)
+  try {
+    const response = await fetch('/api/users', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(user),
+    })
+    
+    if (!response.ok) {
+      let errorMessage = 'Failed to create user'
+      try {
+        const errorData = await response.json()
+        errorMessage = errorData.error || errorMessage
+        console.error('API Error Response:', errorData)
+      } catch (e) {
+        console.error('Failed to parse error response:', e)
+        errorMessage = `HTTP ${response.status}: ${response.statusText}`
+      }
+      throw new Error(errorMessage)
+    }
+    
+    return await response.json()
+  } catch (error: any) {
+    console.error('Error in addUser:', error)
+    throw error
   }
-  return await response.json()
 }
 
 export async function findUserByEmail(email: string): Promise<User | undefined> {

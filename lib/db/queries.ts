@@ -31,15 +31,39 @@ export async function createUser(user: NewUser): Promise<User> {
       profilePhoto: user.profilePhoto ?? null,
     };
     
+    console.log('Creating user with data:', {
+      id: userData.id,
+      name: userData.name,
+      email: userData.email,
+      type: userData.type,
+      hasBio: !!userData.bio,
+      hasStack: !!userData.stack,
+    });
+    
     const result = await db.insert(users).values(userData).returning();
+    console.log('User created successfully:', result[0]?.id);
     return result[0];
   } catch (error: any) {
     console.error('Error in createUser:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      code: error?.code,
+      errno: error?.errno,
+      sql: error?.sql,
+      stack: error?.stack
+    });
+    
     // Re-throw com mensagem mais clara
-    if (error?.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-      throw new Error('Email já cadastrado');
+    if (error?.code === 'SQLITE_CONSTRAINT_UNIQUE' || error?.errno === 19) {
+      throw new Error('Este email já está cadastrado');
     }
-    throw error;
+    
+    // Se for erro de constraint, tentar identificar qual campo
+    if (error?.message?.includes('UNIQUE constraint')) {
+      throw new Error('Este email já está cadastrado');
+    }
+    
+    throw new Error(error?.message || 'Erro ao criar usuário no banco de dados');
   }
 }
 

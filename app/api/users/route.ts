@@ -48,14 +48,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(user, { status: 201 });
   } catch (error: any) {
     console.error('Error creating user:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      code: error?.code,
+      stack: error?.stack,
+      body: body
+    });
     
     // Retornar mensagem de erro mais detalhada
-    const errorMessage = error?.message || 'Failed to create user';
-    const statusCode = error?.code === 'SQLITE_CONSTRAINT_UNIQUE' ? 409 : 500;
+    let errorMessage = 'Failed to create user';
+    let statusCode = 500;
+    
+    if (error?.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      errorMessage = 'Este email já está cadastrado';
+      statusCode = 409;
+    } else if (error?.message) {
+      errorMessage = error.message;
+    } else if (error?.toString) {
+      errorMessage = error.toString();
+    }
     
     return NextResponse.json({ 
       error: errorMessage,
-      details: process.env.NODE_ENV === 'development' ? error?.stack : undefined
+      details: process.env.NODE_ENV === 'development' ? {
+        message: error?.message,
+        code: error?.code,
+        stack: error?.stack
+      } : undefined
     }, { status: statusCode });
   }
 }
