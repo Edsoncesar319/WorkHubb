@@ -18,6 +18,14 @@ export async function getJobById(id: string): Promise<Job | undefined> {
   return await response.json()
 }
 
+export async function getJobsByAuthor(authorId: string): Promise<Job[]> {
+  const response = await fetch(`/api/jobs/author/${authorId}`)
+  if (!response.ok) {
+    throw new Error('Failed to fetch jobs by author')
+  }
+  return await response.json()
+}
+
 export async function addJob(job: Omit<Job, "id" | "createdAt">): Promise<Job> {
   const newJob = {
     ...job,
@@ -75,6 +83,14 @@ export async function hasApplied(userId: string, jobId: string): Promise<boolean
   }
   const data = await response.json()
   return data.applied
+}
+
+export async function getJobApplications(jobId: string): Promise<Array<{ application: Application; user: User | null }>> {
+  const response = await fetch(`/api/applications/job/${jobId}`)
+  if (!response.ok) {
+    throw new Error('Failed to fetch job applications')
+  }
+  return await response.json()
 }
 
 // Funções para usuários

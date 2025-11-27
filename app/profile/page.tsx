@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { getCurrentUser, setCurrentUser } from "@/lib/auth"
-import { getUserApplications, getJobById, updateUser, addUser } from "@/lib/data"
+import { getUserApplications, getJobById, updateUser, addUser, getJobsByAuthor, getJobApplications } from "@/lib/data"
 import { useDatabaseSync } from "@/hooks/use-database-sync"
 import { ImageCropper } from "@/components/image-cropper"
 import type { User, Application, Job } from "@/lib/types"
@@ -33,7 +33,10 @@ import {
   Target,
   Camera,
   Upload,
-  X
+  X,
+  Plus,
+  DollarSign,
+  Building2
 } from "lucide-react"
 import Link from "next/link"
 
@@ -42,6 +45,8 @@ export default function ProfilePage() {
   const { isInitialized } = useDatabaseSync()
   const [user, setUser] = useState<User | null>(null)
   const [applications, setApplications] = useState<Array<Application & { job?: Job }>>([])
+  const [companyJobs, setCompanyJobs] = useState<Job[]>([])
+  const [jobApplications, setJobApplications] = useState<Record<string, Array<{ application: Application; user: User | null }>>>({})
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [editForm, setEditForm] = useState({
@@ -89,6 +94,27 @@ export default function ProfilePage() {
       setApplications(appsWithJobs)
         } catch (error) {
           console.error('Error loading applications:', error)
+        }
+      } else if (currentUser.type === "company") {
+        try {
+          // Carregar vagas da empresa
+          const jobs = await getJobsByAuthor(currentUser.id)
+          setCompanyJobs(jobs)
+          
+          // Carregar candidaturas para cada vaga
+          const applicationsMap: Record<string, Array<{ application: Application; user: User | null }>> = {}
+          for (const job of jobs) {
+            try {
+              const jobApps = await getJobApplications(job.id)
+              applicationsMap[job.id] = jobApps
+            } catch (error) {
+              console.error(`Error loading applications for job ${job.id}:`, error)
+              applicationsMap[job.id] = []
+            }
+          }
+          setJobApplications(applicationsMap)
+        } catch (error) {
+          console.error('Error loading company data:', error)
         }
       }
     }
@@ -299,6 +325,27 @@ export default function ProfilePage() {
                     {user.stack ? user.stack.split(',').length : 0}
                   </div>
                   <div className="text-sm text-muted-foreground">Habilidades</div>
+                </div>
+              </div>
+            )}
+            
+            {user.type === "company" && (
+              <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="text-center p-4 bg-muted/30 rounded-lg">
+                  <div className="text-2xl font-bold text-primary">{companyJobs.length}</div>
+                  <div className="text-sm text-muted-foreground">Vagas Publicadas</div>
+                </div>
+                <div className="text-center p-4 bg-muted/30 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">
+                    {Object.values(jobApplications).flat().length}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Total de Candidaturas</div>
+                </div>
+                <div className="text-center p-4 bg-muted/30 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {companyJobs.filter(job => (jobApplications[job.id]?.length || 0) > 0).length}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Vagas com Candidatos</div>
                 </div>
               </div>
             )}
@@ -519,6 +566,332 @@ export default function ProfilePage() {
               </div>
             )}
           </Card>
+        )}
+
+        {/* Company Jobs and Applications */}
+        {user.type === "company" && (
+          <>
+            {/* Company Jobs Section */}
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <Briefcase className="w-5 h-5 text-primary" />
+                  <h2 className="text-xl font-bold">Vagas Publicadas</h2>
+                </div>
+                <div className="flex gap-2">
+                  <Badge variant="outline">{companyJobs.length} vagas</Badge>
+                  <Link href="/dashboard">
+                    <Button variant="outline" size="sm">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nova Vaga
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+
+              {companyJobs.length === 0 ? (
+                <div className="text-center py-12">
+                  <Briefcase className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Nenhuma vaga publicada ainda</h3>
+                  <p className="text-muted-foreground mb-6">Comece publicando sua primeira vaga</p>
+                  <Link href="/dashboard">
+                    <Button>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Publicar Vaga
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {companyJobs.map((job) => {
+                    const applications = jobApplications[job.id] || []
+                    return (
+                      <Card key={job.id} className="p-4 border-l-4 border-l-primary">
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-lg mb-1">{job.title}</h3>
+                              <p className="text-muted-foreground text-sm mb-2">{job.location}</p>
+                              <p className="text-sm text-muted-foreground line-clamp-2">{job.description}</p>
+                            </div>
+                            <div className="text-right ml-4">
+                              <Badge variant="secondary" className="mb-1">
+                                <Clock className="w-3 h-3 mr-1" />
+                                {new Date(job.createdAt).toLocaleDateString("pt-BR")}
+                              </Badge>
+                              {job.remote && (
+                                <Badge className="bg-primary/20 text-primary border-primary/30 mt-1">
+                                  Remoto
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2 border-t">
+                            <div className="flex items-center gap-2">
+                              <UserIcon className="w-4 h-4 text-muted-foreground" />
+                              <span className="text-sm font-medium">
+                                {applications.length} {applications.length === 1 ? 'candidato' : 'candidatos'}
+                              </span>
+                            </div>
+                            <div className="flex gap-2">
+                              <Link href={`/jobs/${job.id}`}>
+                                <Button variant="outline" size="sm">
+                                  Ver Vaga
+                                </Button>
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    )
+                  })}
+                </div>
+              )}
+            </Card>
+
+            {/* Company Applications Section */}
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <UserIcon className="w-5 h-5 text-primary" />
+                  <h2 className="text-xl font-bold">Candidatos</h2>
+                </div>
+                <Badge variant="outline">
+                  {Object.values(jobApplications).flat().length} candidaturas
+                </Badge>
+              </div>
+
+              {Object.values(jobApplications).flat().length === 0 ? (
+                <div className="text-center py-12">
+                  <UserIcon className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Nenhuma candidatura ainda</h3>
+                  <p className="text-muted-foreground">As candidaturas aparecerão aqui quando profissionais se candidatarem às suas vagas</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {companyJobs.map((job) => {
+                    const applications = jobApplications[job.id] || []
+                    if (applications.length === 0) return null
+
+                    // Função para verificar correspondência de habilidades
+                    const getMatchingSkills = (candidateStack: string | undefined, jobRequirements: string[]) => {
+                      if (!candidateStack) return { matching: [], missing: jobRequirements }
+                      const candidateSkills = candidateStack.split(',').map(s => s.trim().toLowerCase())
+                      const requirements = jobRequirements.map(r => r.trim().toLowerCase())
+                      
+                      const matching = requirements.filter(req => 
+                        candidateSkills.some(skill => 
+                          skill.includes(req) || req.includes(skill) ||
+                          skill.split(' ').some(word => req.includes(word)) ||
+                          req.split(' ').some(word => skill.includes(word))
+                        )
+                      )
+                      const missing = requirements.filter(req => !matching.includes(req))
+                      
+                      return { matching, missing }
+                    }
+
+                    return (
+                      <div key={job.id} className="space-y-4">
+                        {/* Job Profile Card */}
+                        <Card className="p-6 border-l-4 border-l-primary bg-muted/20">
+                          <div className="space-y-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Briefcase className="w-5 h-5 text-primary" />
+                                  <h3 className="text-2xl font-bold">{job.title}</h3>
+                                  <Badge variant="secondary">{applications.length} {applications.length === 1 ? 'candidato' : 'candidatos'}</Badge>
+                                </div>
+                                <div className="flex items-center gap-2 text-muted-foreground mb-3">
+                                  <Building2 className="w-4 h-4" />
+                                  <span>{job.company}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-4 text-sm">
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <MapPin className="w-4 h-4" />
+                                <span>{job.location}</span>
+                              </div>
+                              {job.remote && (
+                                <Badge className="bg-primary/20 text-primary border-primary/30">
+                                  Remoto
+                                </Badge>
+                              )}
+                              {job.salary && (
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                  <DollarSign className="w-4 h-4" />
+                                  <span>{job.salary}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            <Separator />
+
+                            <div>
+                              <h4 className="font-semibold mb-2">Descrição da Vaga</h4>
+                              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
+                                {job.description}
+                              </p>
+                            </div>
+
+                            <div>
+                              <h4 className="font-semibold mb-3">Requisitos</h4>
+                              <div className="flex flex-wrap gap-2">
+                                {job.requirements.map((req, idx) => (
+                                  <Badge key={idx} variant="outline" className="text-xs">
+                                    {req}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </Card>
+
+                        {/* Candidates List */}
+                        <div className="space-y-3">
+                          <h4 className="font-semibold text-lg flex items-center gap-2">
+                            <UserIcon className="w-5 h-5" />
+                            Candidatos ({applications.length})
+                          </h4>
+                          
+                          {applications.map(({ application, user: candidate }) => {
+                            const { matching, missing } = getMatchingSkills(candidate?.stack, job.requirements)
+                            const matchPercentage = job.requirements.length > 0 
+                              ? Math.round((matching.length / job.requirements.length) * 100) 
+                              : 0
+
+                            return (
+                              <Card key={application.id} className="p-4 border-l-4 border-l-green-500">
+                                <div className="space-y-4">
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex items-start gap-3 flex-1">
+                                      <Avatar className="w-12 h-12">
+                                        <AvatarImage 
+                                          src={candidate?.profilePhoto || "/placeholder-user.jpg"} 
+                                          alt={candidate?.name || "Candidato"} 
+                                        />
+                                        <AvatarFallback>
+                                          {candidate ? getInitials(candidate.name) : "U"}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <h4 className="font-semibold">{candidate?.name || "Candidato"}</h4>
+                                          {matchPercentage > 0 && (
+                                            <Badge 
+                                              variant={matchPercentage >= 70 ? "default" : matchPercentage >= 50 ? "secondary" : "outline"}
+                                              className="text-xs"
+                                            >
+                                              {matchPercentage}% match
+                                            </Badge>
+                                          )}
+                                        </div>
+                                        <p className="text-sm text-muted-foreground">{candidate?.email}</p>
+                                        {candidate?.bio && (
+                                          <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                                            {candidate.bio}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <Badge variant="secondary" className="mb-1">
+                                        <Clock className="w-3 h-3 mr-1" />
+                                        {new Date(application.createdAt).toLocaleDateString("pt-BR")}
+                                      </Badge>
+                                    </div>
+                                  </div>
+
+                                  {/* Skills Comparison */}
+                                  {candidate?.stack && (
+                                    <div className="space-y-2">
+                                      <div className="flex items-center justify-between">
+                                        <h5 className="text-sm font-semibold">Habilidades do Candidato</h5>
+                                        <span className="text-xs text-muted-foreground">
+                                          {matching.length} de {job.requirements.length} requisitos atendidos
+                                        </span>
+                                      </div>
+                                      <div className="flex flex-wrap gap-1">
+                                        {candidate.stack.split(',').map((tech, idx) => {
+                                          const techLower = tech.trim().toLowerCase()
+                                          const isMatching = matching.some(req => 
+                                            req.includes(techLower) || techLower.includes(req) ||
+                                            techLower.split(' ').some(word => req.includes(word)) ||
+                                            req.split(' ').some(word => techLower.includes(word))
+                                          )
+                                          return (
+                                            <Badge 
+                                              key={idx} 
+                                              variant={isMatching ? "default" : "outline"} 
+                                              className="text-xs"
+                                            >
+                                              {tech.trim()}
+                                            </Badge>
+                                          )
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {application.message && (
+                                    <div className="bg-muted/30 rounded-lg p-3">
+                                      <p className="text-sm">
+                                        <strong>Mensagem do candidato:</strong> {application.message}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  <div className="flex gap-2 pt-2 border-t">
+                                    {candidate && (
+                                      <>
+                                        {candidate.github && (
+                                          <a
+                                            href={candidate.github.startsWith("http") ? candidate.github : `https://${candidate.github}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                          >
+                                            <Button variant="outline" size="sm">
+                                              <Github className="w-4 h-4 mr-2" />
+                                              GitHub
+                                            </Button>
+                                          </a>
+                                        )}
+                                        {candidate.linkedin && (
+                                          <a
+                                            href={candidate.linkedin.startsWith("http") ? candidate.linkedin : `https://${candidate.linkedin}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                          >
+                                            <Button variant="outline" size="sm">
+                                              <Linkedin className="w-4 h-4 mr-2" />
+                                              LinkedIn
+                                            </Button>
+                                          </a>
+                                        )}
+                                      </>
+                                    )}
+                                    <Link href={`/jobs/${job.id}`}>
+                                      <Button variant="outline" size="sm">
+                                        Ver Vaga Completa
+                                      </Button>
+                                    </Link>
+                                  </div>
+                                </div>
+                              </Card>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </Card>
+          </>
         )}
 
         {/* Image Cropper */}
