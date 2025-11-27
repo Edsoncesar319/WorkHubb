@@ -56,10 +56,16 @@ export async function createUser(user: NewUser): Promise<User> {
     
     // Verificar se o banco está disponível tentando acessá-lo
     try {
-      // Testar se o banco está acessível
-      const testQuery = await db.select().from(users).limit(0);
+      // Testar se o banco está acessível - usar uma query simples
+      await db.select().from(users).limit(0);
+      console.log('Database access test passed');
     } catch (testError: any) {
       console.error('Database access test failed:', testError);
+      console.error('Test error details:', {
+        message: testError?.message,
+        code: testError?.code,
+        stack: testError?.stack
+      });
       throw new Error('Banco de dados não está disponível. Verifique a configuração.');
     }
     

@@ -21,34 +21,41 @@ function getDatabase() {
       console.log('Using in-memory database (build mode)');
     } else {
       // Em desenvolvimento/local, usar arquivo SQLite
-      const dbPath = path.join(process.cwd(), 'lib', 'db', 'workhubb.db');
-      console.log('Initializing database at path:', dbPath);
+      // Usar caminho relativo que será resolvido pelo better-sqlite3
+      const dbPath = './lib/db/workhubb.db';
+      const absolutePath = path.resolve(process.cwd(), dbPath);
+      
+      console.log('Initializing database...');
+      console.log('Relative path:', dbPath);
+      console.log('Absolute path:', absolutePath);
       console.log('Current working directory:', process.cwd());
       
       // Verificar se o diretório existe
-      const dbDir = path.dirname(dbPath);
+      const dbDir = path.dirname(absolutePath);
       if (!fs.existsSync(dbDir)) {
         console.log('Creating database directory:', dbDir);
         fs.mkdirSync(dbDir, { recursive: true });
       }
       
       // Verificar se o arquivo existe
-      const dbExists = fs.existsSync(dbPath);
+      const dbExists = fs.existsSync(absolutePath);
       console.log('Database file exists:', dbExists);
       
       try {
-        sqliteInstance = new Database(dbPath);
-        console.log('Database initialized successfully');
+        // Usar caminho absoluto para garantir que funcione
+        sqliteInstance = new Database(absolutePath);
+        console.log('Database initialized successfully at:', absolutePath);
         
         // Testar uma query simples para garantir que funciona
-        sqliteInstance.prepare('SELECT 1').get();
-        console.log('Database connection test passed');
+        const testResult = sqliteInstance.prepare('SELECT 1 as test').get();
+        console.log('Database connection test passed:', testResult);
       } catch (dbError: any) {
         console.error('Error creating database instance:', dbError);
         console.error('Database error details:', {
           message: dbError?.message,
           code: dbError?.code,
-          errno: dbError?.errno
+          errno: dbError?.errno,
+          path: absolutePath
         });
         throw dbError;
       }
