@@ -26,7 +26,8 @@ O WorkHubb é uma aplicação web desenvolvida em Next.js que facilita a conexã
 - **Icons**: Lucide React
 - **Forms**: React Hook Form, Zod
 - **State Management**: React Hooks
-- **Storage**: LocalStorage (para demonstração)
+- **Database**: SQLite (desenvolvimento) / Vercel Postgres (produção)
+- **File Storage**: Vercel Blob (fotos de perfil)
 
 ## 📦 Instalação e Execução
 

@@ -150,11 +150,31 @@ export default function ProfilePage() {
     try {
       let profilePhoto = editForm.profilePhoto
 
-      // Use cropped image if available, otherwise convert selected image to base64
+      // Upload para Vercel Blob se houver nova imagem
       if (imagePreview && imagePreview !== user.profilePhoto) {
-        profilePhoto = imagePreview
+        // Se a imagem preview é base64 (data:), fazer upload para Blob
+        if (imagePreview.startsWith('data:')) {
+          try {
+            profilePhoto = await uploadBase64ToBlob(imagePreview)
+            console.log('Image uploaded to Vercel Blob:', profilePhoto)
+          } catch (error) {
+            console.error('Error uploading to blob, falling back to base64:', error)
+            // Fallback para base64 se o upload falhar
+            profilePhoto = imagePreview
+          }
+        } else {
+          // Já é uma URL do Blob
+          profilePhoto = imagePreview
+        }
       } else if (selectedImage) {
-        profilePhoto = await convertToBase64(selectedImage)
+        try {
+          profilePhoto = await uploadToBlob(selectedImage)
+          console.log('Image uploaded to Vercel Blob:', profilePhoto)
+        } catch (error) {
+          console.error('Error uploading to blob, falling back to base64:', error)
+          // Fallback para base64 se o upload falhar
+          profilePhoto = await convertToBase64(selectedImage)
+        }
       }
 
       const updatedUser = await updateUser(user.id, {
@@ -258,6 +278,46 @@ export default function ProfilePage() {
       reader.onload = () => resolve(reader.result as string)
       reader.onerror = error => reject(error)
     })
+  }
+
+  const uploadToBlob = async (file: File): Promise<string> => {
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Erro ao fazer upload da imagem')
+      }
+
+      const data = await response.json()
+      return data.url
+    } catch (error: any) {
+      console.error('Error uploading to blob:', error)
+      throw error
+    }
+  }
+
+  const uploadBase64ToBlob = async (base64String: string): Promise<string> => {
+    try {
+      // Converter base64 para Blob
+      const response = await fetch(base64String)
+      const blob = await response.blob()
+      
+      // Criar File a partir do Blob
+      const file = new File([blob], 'profile-photo.jpg', { type: blob.type })
+      
+      // Fazer upload para Vercel Blob
+      return await uploadToBlob(file)
+    } catch (error: any) {
+      console.error('Error uploading base64 to blob:', error)
+      throw error
+    }
   }
 
   const [experienceForm, setExperienceForm] = useState({
