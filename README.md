@@ -26,7 +26,7 @@ O WorkHubb é uma aplicação web desenvolvida em Next.js que facilita a conexã
 - **Icons**: Lucide React
 - **Forms**: React Hook Form, Zod
 - **State Management**: React Hooks
-- **Database**: SQLite (desenvolvimento) / Vercel Postgres (produção)
+- **Database**: SQLite (desenvolvimento) / Vercel Postgres (produção) - **Detecção automática**
 - **File Storage**: Vercel Blob (fotos de perfil)
 
 ## 📦 Instalação e Execução
@@ -50,7 +50,28 @@ O WorkHubb é uma aplicação web desenvolvida em Next.js que facilita a conexã
    yarn install
    ```
 
-3. **Execute a aplicação em modo de desenvolvimento**
+3. **Configure as variáveis de ambiente (Opcional)**
+   
+   Crie um arquivo `.env.local` na raiz do projeto:
+   ```env
+   # Opcional: Token do Vercel Blob para upload de fotos de perfil
+   # Obtenha em: https://vercel.com/dashboard > Storage > Blob > Settings
+   BLOB_READ_WRITE_TOKEN=vercel_blob_rw_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+   
+   # Opcional: Para usar Postgres localmente (padrão: SQLite)
+   # POSTGRES_URL=postgresql://user:password@localhost:5432/workhubb
+   ```
+   
+   > **Nota**: 
+   - O sistema funciona sem o token do Blob, mas usará base64 para fotos (não recomendado para produção).
+   - Para desenvolvimento local, o SQLite é usado automaticamente (não precisa configurar nada).
+   - Para produção na Vercel, configure o Vercel Postgres (veja [VERCEL_POSTGRES_SETUP.md](./VERCEL_POSTGRES_SETUP.md))
+   
+   Para mais detalhes:
+   - [VERCEL_BLOB_SETUP.md](./VERCEL_BLOB_SETUP.md) - Configuração do Vercel Blob
+   - [VERCEL_POSTGRES_SETUP.md](./VERCEL_POSTGRES_SETUP.md) - Configuração do Vercel Postgres
+
+4. **Execute a aplicação em modo de desenvolvimento**
    ```bash
    npm run dev
    # ou

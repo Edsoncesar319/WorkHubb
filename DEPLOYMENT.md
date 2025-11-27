@@ -1,31 +1,44 @@
 # Guia de Deploy - WorkHubb
 
-## ⚠️ Importante: Banco de Dados
+## ✅ Banco de Dados Híbrido
 
-Este projeto atualmente usa **SQLite com better-sqlite3**, que **não funciona em ambientes serverless** como a Vercel.
+Este projeto agora suporta **ambos SQLite (desenvolvimento) e Vercel Postgres (produção)** automaticamente!
 
-### Solução Recomendada: Migrar para Vercel Postgres
+O sistema detecta automaticamente o ambiente:
+- **Desenvolvimento local**: Usa SQLite (`better-sqlite3`)
+- **Vercel (produção)**: Usa Vercel Postgres (quando `POSTGRES_URL` estiver configurado)
 
-Para fazer deploy na Vercel, você precisa migrar para um banco de dados compatível com serverless:
+### Configuração para Vercel
 
-#### Opção 1: Vercel Postgres (Recomendado)
+#### Passo 1: Criar Vercel Postgres
 
 1. No dashboard da Vercel, vá para seu projeto
 2. Vá em **Storage** > **Create Database** > **Postgres**
-3. Copie a string de conexão
-4. Instale o driver:
-   ```bash
-   npm install @vercel/postgres drizzle-orm
-   npm uninstall better-sqlite3
-   ```
-5. Atualize `lib/db/index.ts` para usar Postgres:
-   ```typescript
-   import { drizzle } from 'drizzle-orm/vercel-postgres';
-   import { sql } from '@vercel/postgres';
-   import * as schema from './schema';
-   
-   export const db = drizzle(sql, { schema });
-   ```
+3. Escolha um nome para o banco
+4. Selecione a região (recomendado: mais próxima dos seus usuários)
+5. Clique em **Create**
+
+#### Passo 2: Configurar Variável de Ambiente
+
+A variável `POSTGRES_URL` será automaticamente configurada pela Vercel quando você conectar o banco ao projeto.
+
+Para verificar:
+1. No dashboard do Postgres, vá em **Settings**
+2. Na seção **Environment Variables**, você verá `POSTGRES_URL`
+3. Certifique-se de que está conectado ao seu projeto
+
+#### Passo 3: Criar as Tabelas
+
+Após criar o banco Postgres, você precisa criar as tabelas. Execute o script de migração:
+
+```bash
+# Gerar migrações para PostgreSQL
+npm run db:generate
+
+# Aplicar migrações (ou criar manualmente via SQL)
+```
+
+Ou crie as tabelas manualmente usando o SQL em `lib/db/migrations/` adaptado para PostgreSQL.
 
 #### Opção 2: Supabase (Alternativa)
 
