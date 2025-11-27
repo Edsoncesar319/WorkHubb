@@ -28,7 +28,9 @@ export default function LoginPage() {
       const user = await findUserByEmail(formData.email)
 
       if (!user) {
-        setError("Email não encontrado")
+        // Verificar se o erro é relacionado ao banco não estar configurado
+        // Isso pode acontecer se o Postgres não foi configurado na Vercel
+        setError("Email não encontrado. Verifique se você já possui uma conta ou se o banco de dados está configurado.")
         return
       }
 
@@ -36,9 +38,22 @@ export default function LoginPage() {
       // For demo purposes, we'll just log them in
       setCurrentUser(user)
       router.push(user.type === "company" ? "/dashboard" : "/jobs")
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error during login:', error)
-      setError("Erro ao fazer login. Tente novamente.")
+      
+      // Verificar se o erro é relacionado ao banco não estar configurado
+      const errorMessage = error?.message || ''
+      if (errorMessage.includes('Vercel Postgres não configurado') || 
+          errorMessage.includes('not configured') ||
+          errorMessage.includes('not available')) {
+        setError(
+          "Banco de dados não configurado. " +
+          "Por favor, configure o Vercel Postgres. " +
+          "Veja CONFIGURACAO_RAPIDA.md para instruções."
+        )
+      } else {
+        setError("Erro ao fazer login. Tente novamente.")
+      }
     }
   }
 

@@ -155,11 +155,28 @@ export async function findUserByEmail(email: string): Promise<User | undefined> 
         statusText: response.statusText,
         message: errorMessage
       })
+      
+      // Se for erro 500 relacionado ao banco não configurado, lançar erro específico
+      if (response.status === 500 && (
+        errorMessage.includes('Vercel Postgres não configurado') ||
+        errorMessage.includes('not configured') ||
+        errorMessage.includes('not available')
+      )) {
+        throw new Error('Vercel Postgres não configurado')
+      }
+      
       throw new Error(errorMessage)
     }
     
     return await response.json()
   } catch (error: any) {
+    // Se for um erro relacionado ao banco não configurado, lançar para que o login mostre mensagem apropriada
+    if (error?.message?.includes('Vercel Postgres não configurado') ||
+        error?.message?.includes('not configured') ||
+        error?.message?.includes('not available')) {
+      throw error
+    }
+    
     // Se for um erro de rede ou outro erro, logar mas não lançar
     // Retornar undefined para permitir que o registro continue
     console.error('Error finding user by email:', error)
@@ -168,7 +185,7 @@ export async function findUserByEmail(email: string): Promise<User | undefined> 
     // para permitir que o registro continue (assumindo que o email não existe)
     if (error?.message?.includes('fetch') || error?.name === 'TypeError') {
       console.warn('Network error when checking email, allowing registration to continue')
-    return undefined
+      return undefined
     }
     
     // Para outros erros, lançar para que o usuário saiba que algo deu errado

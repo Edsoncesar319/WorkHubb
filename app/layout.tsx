@@ -13,7 +13,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "WorkHubb - Conectando Talentos Tech",
   description: "A plataforma que conecta talentos tech com as melhores oportunidades do mercado",
-    generator: 'v0.app'
+  generator: 'v0.app',
 }
 
 export default function RootLayout({
