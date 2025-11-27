@@ -30,6 +30,7 @@ export async function GET(
     const errorMessage = error?.message || '';
     if (errorMessage.includes('not available') || 
         errorMessage.includes('not configured') ||
+        errorMessage.includes('Vercel Postgres não configurado') ||
         errorMessage.includes('Failed to create')) {
       console.warn('Database not available, returning 404 to allow registration');
       return NextResponse.json({ error: 'User not found' }, { status: 404 });

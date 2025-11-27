@@ -1,8 +1,14 @@
 import * as schema from './schema';
 
 // Detectar ambiente
-const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
-const hasPostgresUrl = !!process.env.POSTGRES_URL;
+const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL_ENV;
+// A Vercel pode usar diferentes variáveis para Postgres
+const hasPostgresUrl = !!(
+  process.env.POSTGRES_URL || 
+  process.env.POSTGRES_URL_NON_POOLING || 
+  process.env.POSTGRES_PRISMA_URL ||
+  process.env.DATABASE_URL
+);
 
 // Lazy loading do banco de dados
 let dbInstance: any = null;
@@ -22,6 +28,12 @@ async function initDb() {
       // Se estiver na Vercel e tiver POSTGRES_URL, usar Postgres
       if (isVercel && hasPostgresUrl) {
         console.log('Initializing Vercel Postgres database...');
+        console.log('Postgres environment variables:', {
+          hasPostgresUrl: !!process.env.POSTGRES_URL,
+          hasPostgresUrlNonPooling: !!process.env.POSTGRES_URL_NON_POOLING,
+          hasPostgresPrismaUrl: !!process.env.POSTGRES_PRISMA_URL,
+          hasDatabaseUrl: !!process.env.DATABASE_URL,
+        });
         
         const { drizzle } = await import('drizzle-orm/vercel-postgres');
         const { sql } = await import('@vercel/postgres');
@@ -64,15 +76,27 @@ async function initDb() {
         code: error?.code,
         isVercel,
         hasPostgresUrl,
-        postgresUrl: hasPostgresUrl ? 'configured' : 'not set'
+        postgresUrl: hasPostgresUrl ? 'configured' : 'not set',
+        envVars: {
+          VERCEL: process.env.VERCEL,
+          VERCEL_ENV: process.env.VERCEL_ENV,
+          POSTGRES_URL: process.env.POSTGRES_URL ? 'set' : 'not set',
+          POSTGRES_URL_NON_POOLING: process.env.POSTGRES_URL_NON_POOLING ? 'set' : 'not set',
+          POSTGRES_PRISMA_URL: process.env.POSTGRES_PRISMA_URL ? 'set' : 'not set',
+          DATABASE_URL: process.env.DATABASE_URL ? 'set' : 'not set',
+        }
       });
       
       if (isVercel && !hasPostgresUrl) {
-        throw new Error(
-          'Vercel Postgres não configurado. ' +
-          'Por favor, crie um banco Postgres na Vercel e configure POSTGRES_URL. ' +
-          'Veja DEPLOYMENT.md para instruções.'
-        );
+        const errorMsg = 
+          'Vercel Postgres não configurado.\n\n' +
+          'Para configurar:\n' +
+          '1. Acesse https://vercel.com/dashboard\n' +
+          '2. Vá em Storage > Create Database > Postgres\n' +
+          '3. Crie o banco e conecte ao seu projeto\n' +
+          '4. Execute o SQL em scripts/create-postgres-tables.sql\n\n' +
+          'Veja DEPLOY_GUIDE.md para instruções detalhadas.';
+        throw new Error(errorMsg);
       }
       
       throw error;

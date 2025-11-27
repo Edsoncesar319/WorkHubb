@@ -41,10 +41,10 @@ export default function RegisterPage() {
     try {
       // Verificar se o email já existe
       try {
-        const existingUser = await findUserByEmail(formData.email)
-        if (existingUser) {
-          setError("Este email já está cadastrado")
-          return
+      const existingUser = await findUserByEmail(formData.email)
+      if (existingUser) {
+        setError("Este email já está cadastrado")
+        return
         }
       } catch (emailCheckError: any) {
         // Se houver erro ao verificar email, logar mas continuar

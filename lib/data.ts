@@ -104,15 +104,15 @@ export async function getUsers(): Promise<User[]> {
 
 export async function addUser(user: User): Promise<User> {
   try {
-    const response = await fetch('/api/users', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(user),
-    })
+  const response = await fetch('/api/users', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(user),
+  })
     
-    if (!response.ok) {
+  if (!response.ok) {
       let errorMessage = 'Failed to create user'
       try {
         const errorData = await response.json()
@@ -123,9 +123,9 @@ export async function addUser(user: User): Promise<User> {
         errorMessage = `HTTP ${response.status}: ${response.statusText}`
       }
       throw new Error(errorMessage)
-    }
+  }
     
-    return await response.json()
+  return await response.json()
   } catch (error: any) {
     console.error('Error in addUser:', error)
     throw error
@@ -168,7 +168,7 @@ export async function findUserByEmail(email: string): Promise<User | undefined> 
     // para permitir que o registro continue (assumindo que o email não existe)
     if (error?.message?.includes('fetch') || error?.name === 'TypeError') {
       console.warn('Network error when checking email, allowing registration to continue')
-      return undefined
+    return undefined
     }
     
     // Para outros erros, lançar para que o usuário saiba que algo deu errado

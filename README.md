@@ -139,21 +139,61 @@ npm run start        # Inicia o servidor de produção
 npm run lint         # Executa o linter ESLint
 ```
 
-## 🚀 Deploy
+## 🚀 Deploy na Vercel
 
-Para fazer deploy da aplicação:
+O WorkHubb está configurado para deploy automático na Vercel com suporte híbrido para SQLite (desenvolvimento) e Vercel Postgres (produção).
 
-1. **Build de produção**
-   ```bash
-   npm run build
-   ```
+### Deploy Rápido
 
-2. **Inicie o servidor de produção**
-   ```bash
-   npm run start
-   ```
+1. **Conecte seu repositório à Vercel**
+   - Acesse [vercel.com/dashboard](https://vercel.com/dashboard)
+   - Clique em "Add New Project"
+   - Importe seu repositório Git
 
-A aplicação estará disponível na porta 3000 por padrão.
+2. **Configure o Vercel Postgres**
+   - No dashboard da Vercel, vá em **Storage** > **Create Database** > **Postgres**
+   - Conecte o banco ao seu projeto
+   - Execute o script SQL em `scripts/create-postgres-tables.sql` no console do Postgres
+
+3. **Deploy automático**
+   - Faça push das alterações para o Git
+   - O deploy será feito automaticamente
+
+### Guia Completo
+
+Para instruções detalhadas, consulte:
+- **[DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md)** - Guia completo passo a passo
+- **[VERCEL_POSTGRES_SETUP.md](./VERCEL_POSTGRES_SETUP.md)** - Configuração do Postgres
+- **[VERCEL_BLOB_SETUP.md](./VERCEL_BLOB_SETUP.md)** - Configuração do Blob (opcional)
+
+### Verificação Pré-Deploy
+
+Antes de fazer o deploy, execute:
+
+```bash
+npx tsx scripts/verify-deploy.ts
+```
+
+Este script verifica se tudo está configurado corretamente.
+
+### Deploy Manual
+
+```bash
+# Instalar Vercel CLI
+npm i -g vercel
+
+# Fazer login
+vercel login
+
+# Deploy para produção
+vercel --prod
+```
+
+### URL de Produção
+
+Após o deploy, sua aplicação estará disponível em:
+- **Produção**: `https://work-hubb.vercel.app`
+- **Preview**: Cada push cria um preview deployment único
 
 ## 🤝 Contribuição
 

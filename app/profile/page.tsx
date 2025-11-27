@@ -160,7 +160,7 @@ export default function ProfilePage() {
           } catch (error) {
             console.error('Error uploading to blob, falling back to base64:', error)
             // Fallback para base64 se o upload falhar
-            profilePhoto = imagePreview
+        profilePhoto = imagePreview
           }
         } else {
           // Já é uma URL do Blob
@@ -173,7 +173,7 @@ export default function ProfilePage() {
         } catch (error) {
           console.error('Error uploading to blob, falling back to base64:', error)
           // Fallback para base64 se o upload falhar
-          profilePhoto = await convertToBase64(selectedImage)
+        profilePhoto = await convertToBase64(selectedImage)
         }
       }
 
@@ -577,26 +577,26 @@ export default function ProfilePage() {
 
             {/* Experience Section */}
             {user.type === "professional" && (
-              <Card className="p-6">
+            <Card className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <Briefcase className="w-5 h-5 text-primary" />
+                <Briefcase className="w-5 h-5 text-primary" />
                     <h2 className="text-xl font-bold">Experiência Profissional</h2>
                   </div>
                   <Button variant="outline" size="sm" onClick={handleAddExperience}>
                     <Plus className="w-4 h-4 mr-2" />
                     Adicionar Experiência
                   </Button>
-                </div>
-                
+              </div>
+              
                 {experiences.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Briefcase className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground mb-4">Adicione sua experiência profissional</p>
+              <div className="text-center py-8">
+                <Briefcase className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground mb-4">Adicione sua experiência profissional</p>
                     <Button variant="outline" size="sm" onClick={handleAddExperience}>
                       <Plus className="w-4 h-4 mr-2" />
-                      Adicionar Experiência
-                    </Button>
+                  Adicionar Experiência
+                </Button>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -647,8 +647,8 @@ export default function ProfilePage() {
                               <X className="w-4 h-4" />
                             </Button>
                           </div>
-                        </div>
-                      </Card>
+              </div>
+            </Card>
                     ))}
                   </div>
                 )}
