@@ -22,16 +22,36 @@ function getDatabase() {
     } else {
       // Em desenvolvimento/local, usar arquivo SQLite
       const dbPath = path.join(process.cwd(), 'lib', 'db', 'workhubb.db');
-      console.log('Database path:', dbPath);
+      console.log('Initializing database at path:', dbPath);
+      console.log('Current working directory:', process.cwd());
       
       // Verificar se o diretório existe
       const dbDir = path.dirname(dbPath);
       if (!fs.existsSync(dbDir)) {
+        console.log('Creating database directory:', dbDir);
         fs.mkdirSync(dbDir, { recursive: true });
       }
       
-      sqliteInstance = new Database(dbPath);
-      console.log('Database initialized successfully');
+      // Verificar se o arquivo existe
+      const dbExists = fs.existsSync(dbPath);
+      console.log('Database file exists:', dbExists);
+      
+      try {
+        sqliteInstance = new Database(dbPath);
+        console.log('Database initialized successfully');
+        
+        // Testar uma query simples para garantir que funciona
+        sqliteInstance.prepare('SELECT 1').get();
+        console.log('Database connection test passed');
+      } catch (dbError: any) {
+        console.error('Error creating database instance:', dbError);
+        console.error('Database error details:', {
+          message: dbError?.message,
+          code: dbError?.code,
+          errno: dbError?.errno
+        });
+        throw dbError;
+      }
     }
     
     return sqliteInstance;
@@ -52,24 +72,40 @@ function getDb() {
     return dbInstance;
   }
 
-  const sqlite = getDatabase();
-  if (!sqlite) {
-    // Retornar um mock que falhará em runtime mas permitirá o build
-    return null as any;
-  }
+  try {
+    const sqlite = getDatabase();
+    if (!sqlite) {
+      console.error('SQLite instance is null');
+      throw new Error('Database not available. SQLite instance could not be created.');
+    }
 
-  dbInstance = drizzle(sqlite, { schema });
-  return dbInstance;
+    dbInstance = drizzle(sqlite, { schema });
+    console.log('Drizzle instance created successfully');
+    return dbInstance;
+  } catch (error: any) {
+    console.error('Error creating Drizzle instance:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      code: error?.code,
+      stack: error?.stack
+    });
+    throw error;
+  }
 }
 
 // Exporta a função getDb ao invés de db direto para lazy loading
 export const db = new Proxy({} as ReturnType<typeof drizzle>, {
   get(target, prop) {
-    const db = getDb();
-    if (!db) {
-      throw new Error('Database not available. Please configure a database for production (e.g., Vercel Postgres).');
+    try {
+      const db = getDb();
+      if (!db) {
+        throw new Error('Database not available. Please configure a database for production (e.g., Vercel Postgres).');
+      }
+      return (db as any)[prop];
+    } catch (error: any) {
+      console.error('Error accessing database property:', prop, error);
+      throw error;
     }
-    return (db as any)[prop];
   }
 });
 

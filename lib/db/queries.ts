@@ -54,9 +54,13 @@ export async function createUser(user: NewUser): Promise<User> {
       hasStack: !!userData.stack,
     });
     
-    // Verificar se o banco está disponível
-    if (!db) {
-      throw new Error('Banco de dados não está disponível');
+    // Verificar se o banco está disponível tentando acessá-lo
+    try {
+      // Testar se o banco está acessível
+      const testQuery = await db.select().from(users).limit(0);
+    } catch (testError: any) {
+      console.error('Database access test failed:', testError);
+      throw new Error('Banco de dados não está disponível. Verifique a configuração.');
     }
     
     const result = await db.insert(users).values(userData).returning();
