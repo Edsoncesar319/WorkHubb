@@ -23,6 +23,11 @@ export async function createUser(user: NewUser): Promise<User> {
   return result[0];
 }
 
+export async function updateUser(id: string, user: Partial<NewUser>): Promise<User | undefined> {
+  const result = await db.update(users).set(user).where(eq(users.id, id)).returning();
+  return result[0];
+}
+
 // Funções para vagas
 export async function getAllJobs(): Promise<Job[]> {
   const dbJobs = await db.select().from(jobs).orderBy(desc(jobs.createdAt));

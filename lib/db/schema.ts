@@ -12,6 +12,7 @@ export const users = sqliteTable('users', {
   github: text('github'),
   linkedin: text('linkedin'),
   company: text('company'),
+  profilePhoto: text('profile_photo'),
   createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 

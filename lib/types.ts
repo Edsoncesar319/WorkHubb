@@ -10,6 +10,7 @@ export interface User {
   github?: string
   linkedin?: string
   company?: string
+  profilePhoto?: string
   createdAt: string
 }
 

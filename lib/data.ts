@@ -113,3 +113,23 @@ export async function findUserByEmail(email: string): Promise<User | undefined> 
     return undefined
   }
 }
+
+export async function updateUser(id: string, user: Partial<User>): Promise<User | undefined> {
+  try {
+    const response = await fetch(`/api/users/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(user),
+    })
+    if (!response.ok) {
+      if (response.status === 404) return undefined
+      throw new Error('Failed to update user')
+    }
+    return await response.json()
+  } catch (error) {
+    console.error('Error updating user:', error)
+    return undefined
+  }
+}

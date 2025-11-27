@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label"
 import { getCurrentUser, setCurrentUser } from "@/lib/auth"
 import { getUserApplications, getJobById, updateUser, addUser } from "@/lib/data"
 import { useDatabaseSync } from "@/hooks/use-database-sync"
+import { ImageCropper } from "@/components/image-cropper"
 import type { User, Application, Job } from "@/lib/types"
 import { 
   Github, 
@@ -53,6 +54,8 @@ export default function ProfilePage() {
   })
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [isCropperOpen, setIsCropperOpen] = useState(false)
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isInitialized) return
@@ -114,8 +117,10 @@ export default function ProfilePage() {
     try {
       let profilePhoto = editForm.profilePhoto
 
-      // Convert selected image to base64 if there's a new image
-      if (selectedImage) {
+      // Use cropped image if available, otherwise convert selected image to base64
+      if (imagePreview && imagePreview !== user.profilePhoto) {
+        profilePhoto = imagePreview
+      } else if (selectedImage) {
         profilePhoto = await convertToBase64(selectedImage)
       }
 
@@ -186,10 +191,12 @@ export default function ProfilePage() {
 
       setSelectedImage(file)
       
-      // Create preview
+      // Create preview and open cropper
       const reader = new FileReader()
       reader.onload = (e) => {
-        setImagePreview(e.target?.result as string)
+        const imageData = e.target?.result as string
+        setImageToCrop(imageData)
+        setIsCropperOpen(true)
       }
       reader.readAsDataURL(file)
     }
@@ -198,10 +205,17 @@ export default function ProfilePage() {
   const removeImage = () => {
     setSelectedImage(null)
     setImagePreview(null)
+    setImageToCrop(null)
     setEditForm(prev => ({
       ...prev,
       profilePhoto: ""
     }))
+  }
+
+  const handleCropComplete = (croppedImage: string) => {
+    setImagePreview(croppedImage)
+    setIsCropperOpen(false)
+    setImageToCrop(null)
   }
 
   const convertToBase64 = (file: File): Promise<string> => {
@@ -507,6 +521,20 @@ export default function ProfilePage() {
           </Card>
         )}
 
+        {/* Image Cropper */}
+        {imageToCrop && (
+          <ImageCropper
+            image={imageToCrop}
+            isOpen={isCropperOpen}
+            onClose={() => {
+              setIsCropperOpen(false)
+              setImageToCrop(null)
+            }}
+            onCrop={handleCropComplete}
+            aspectRatio={1}
+          />
+        )}
+
         {/* Edit Profile Modal */}
         <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -560,13 +588,36 @@ export default function ProfilePage() {
                       className="hidden"
                       id="profile-photo-upload"
                     />
-                    <Label 
-                      htmlFor="profile-photo-upload" 
-                      className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 border border-dashed border-muted-foreground/25 rounded-md hover:border-muted-foreground/50 transition-colors"
-                    >
-                      <Camera className="w-4 h-4" />
-                      {selectedImage ? "Alterar Foto" : "Escolher Foto"}
-                    </Label>
+                    <div className="flex flex-col gap-2">
+                      <Label 
+                        htmlFor="profile-photo-upload" 
+                        className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 border border-dashed border-muted-foreground/25 rounded-md hover:border-muted-foreground/50 transition-colors"
+                      >
+                        <Camera className="w-4 h-4" />
+                        {selectedImage ? "Alterar Foto" : "Escolher Foto"}
+                      </Label>
+                      {imagePreview && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (imageToCrop) {
+                              setIsCropperOpen(true)
+                            } else if (selectedImage) {
+                              const reader = new FileReader()
+                              reader.onload = (e) => {
+                                setImageToCrop(e.target?.result as string)
+                                setIsCropperOpen(true)
+                              }
+                              reader.readAsDataURL(selectedImage)
+                            }
+                          }}
+                        >
+                          <Edit className="w-4 h-4 mr-2" />
+                          Ajustar Foto
+                        </Button>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       JPG, PNG ou GIF. Máximo 5MB.
                     </p>
