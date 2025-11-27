@@ -19,8 +19,28 @@ export async function getUserByEmail(email: string): Promise<User | undefined> {
 }
 
 export async function createUser(user: NewUser): Promise<User> {
-  const result = await db.insert(users).values(user).returning();
-  return result[0];
+  try {
+    // Garantir que campos opcionais sejam null ao invés de undefined
+    const userData = {
+      ...user,
+      bio: user.bio ?? null,
+      stack: user.stack ?? null,
+      github: user.github ?? null,
+      linkedin: user.linkedin ?? null,
+      company: user.company ?? null,
+      profilePhoto: user.profilePhoto ?? null,
+    };
+    
+    const result = await db.insert(users).values(userData).returning();
+    return result[0];
+  } catch (error: any) {
+    console.error('Error in createUser:', error);
+    // Re-throw com mensagem mais clara
+    if (error?.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      throw new Error('Email já cadastrado');
+    }
+    throw error;
+  }
 }
 
 export async function updateUser(id: string, user: Partial<NewUser>): Promise<User | undefined> {

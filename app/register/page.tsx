@@ -56,6 +56,7 @@ export default function RegisterPage() {
         github: formData.github || undefined,
         linkedin: formData.linkedin || undefined,
         company: userType === "company" ? formData.company : undefined,
+        profilePhoto: undefined,
         createdAt: new Date().toISOString(),
       }
 
