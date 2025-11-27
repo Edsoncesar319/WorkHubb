@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, use } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -13,8 +13,9 @@ import type { Job } from "@/lib/types"
 import { MapPin, DollarSign, Building2, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 
-export default function JobDetailPage({ params }: { params: { id: string } }) {
+export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
+  const resolvedParams = use(params)
   const [job, setJob] = useState<Job | null>(null)
   const [message, setMessage] = useState("")
   const [applied, setApplied] = useState(false)
@@ -23,17 +24,17 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     const loadJobData = async () => {
-      const foundJob = await getJobById(params.id)
+      const foundJob = await getJobById(resolvedParams.id)
       if (foundJob) {
         setJob(foundJob)
         if (user) {
-          const hasUserApplied = await hasApplied(user.id, params.id)
+          const hasUserApplied = await hasApplied(user.id, resolvedParams.id)
           setApplied(hasUserApplied)
         }
       }
     }
     loadJobData()
-  }, [params.id, user])
+  }, [resolvedParams.id, user])
 
   const handleApply = async () => {
     if (!user) {

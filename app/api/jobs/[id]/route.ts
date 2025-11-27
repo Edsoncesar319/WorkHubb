@@ -3,10 +3,11 @@ import { getJobById } from '@/lib/db/queries';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const job = await getJobById(params.id);
+    const { id } = await params;
+    const job = await getJobById(id);
     if (!job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
