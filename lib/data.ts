@@ -135,14 +135,44 @@ export async function addUser(user: User): Promise<User> {
 export async function findUserByEmail(email: string): Promise<User | undefined> {
   try {
     const response = await fetch(`/api/users/email/${encodeURIComponent(email)}`)
-    if (!response.ok) {
-      if (response.status === 404) return undefined
-      throw new Error('Failed to fetch user')
+    
+    // 404 significa que o usuário não existe, o que é válido
+    if (response.status === 404) {
+      return undefined
     }
+    
+    if (!response.ok) {
+      // Tentar obter mensagem de erro da resposta
+      let errorMessage = 'Failed to fetch user'
+      try {
+        const errorData = await response.json()
+        errorMessage = errorData.error || errorData.message || errorMessage
+      } catch {
+        // Se não conseguir parsear JSON, usar mensagem padrão
+      }
+      console.error('Error fetching user by email:', {
+        status: response.status,
+        statusText: response.statusText,
+        message: errorMessage
+      })
+      throw new Error(errorMessage)
+    }
+    
     return await response.json()
-  } catch (error) {
+  } catch (error: any) {
+    // Se for um erro de rede ou outro erro, logar mas não lançar
+    // Retornar undefined para permitir que o registro continue
     console.error('Error finding user by email:', error)
-    return undefined
+    
+    // Se for um erro de rede (fetch falhou), retornar undefined
+    // para permitir que o registro continue (assumindo que o email não existe)
+    if (error?.message?.includes('fetch') || error?.name === 'TypeError') {
+      console.warn('Network error when checking email, allowing registration to continue')
+      return undefined
+    }
+    
+    // Para outros erros, lançar para que o usuário saiba que algo deu errado
+    throw error
   }
 }
 

@@ -12,6 +12,7 @@ export async function GET(
     
     const user = await getUserByEmail(email);
     if (!user) {
+      // Retornar 404 quando usuário não existe (caso válido)
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
     return NextResponse.json(user);
@@ -23,9 +24,20 @@ export async function GET(
       stack: error?.stack
     });
     
-    const errorMessage = error?.message || 'Failed to fetch user';
+    // Se o erro for relacionado ao banco não estar disponível,
+    // retornar 404 em vez de 500 para permitir que o registro continue
+    // (assumindo que o email não existe se o banco não está disponível)
+    const errorMessage = error?.message || '';
+    if (errorMessage.includes('not available') || 
+        errorMessage.includes('not configured') ||
+        errorMessage.includes('Failed to create')) {
+      console.warn('Database not available, returning 404 to allow registration');
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+    
+    // Para outros erros, retornar 500
     return NextResponse.json({ 
-      error: errorMessage,
+      error: errorMessage || 'Failed to fetch user',
       details: process.env.NODE_ENV === 'development' ? {
         message: error?.message,
         code: error?.code
