@@ -21,15 +21,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Gerar nome único para o arquivo
+    // Usar addRandomSuffix: true (melhor prática) para garantir unicidade e evitar sobrescrita acidental
+    // Isso cria um caminho como: profile-photos/avatar-123456-oYnXSVczoLa9yBYMFJOSNdaiiervF5.jpg
     const timestamp = Date.now();
-    const randomSuffix = Math.random().toString(36).substring(2, 15);
     const fileExtension = file.name.split('.').pop() || 'jpg';
-    const fileName = `profile-photos/${timestamp}-${randomSuffix}.${fileExtension}`;
+    const fileName = `profile-photos/avatar-${timestamp}.${fileExtension}`;
 
     // Upload para Vercel Blob
+    // addRandomSuffix: true garante que cada blob seja único (tratamento como imutável)
+    // Isso evita problemas de cache e permite melhor performance
     const blob = await put(fileName, file, {
       access: 'public',
-      addRandomSuffix: false, // Já estamos adicionando sufixo único
+      addRandomSuffix: true, // Melhor prática: trata blobs como imutáveis
+      cacheControlMaxAge: 2592000, // Cache de 30 dias (padrão recomendado)
     });
 
     return NextResponse.json({ 

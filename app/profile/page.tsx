@@ -296,6 +296,10 @@ export default function ProfilePage() {
       }
 
       const data = await response.json()
+      console.log('Upload successful:', {
+        url: data.url,
+        pathname: data.pathname
+      })
       return data.url
     } catch (error: any) {
       console.error('Error uploading to blob:', error)

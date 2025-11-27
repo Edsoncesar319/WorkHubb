@@ -65,11 +65,19 @@ Para desenvolvimento local, você ainda precisa:
 2. Configurar a variável `BLOB_READ_WRITE_TOKEN` no `.env.local`
 3. O sistema funcionará normalmente
 
+### Configuração do Token
+
+O token é automaticamente detectado pelo SDK do Vercel Blob através da variável de ambiente `BLOB_READ_WRITE_TOKEN`. 
+
+**Importante**: O token é necessário apenas para uploads (escrita). Para leitura de blobs públicos, não é necessário token.
+
 ## ⚠️ Importante
 
 - **Fotos antigas**: Fotos em base64 continuarão funcionando normalmente
 - **Migração**: Fotos antigas serão migradas automaticamente para Blob quando o usuário atualizar o perfil
 - **Fallback**: Se o upload para Blob falhar, o sistema usa base64 como fallback
+- **Imutabilidade**: Cada upload cria um novo blob único (usando `addRandomSuffix: true`), evitando problemas de cache
+- **Cache**: Blobs são cacheados por 30 dias por padrão para melhor performance
 
 ## 📊 Monitoramento
 
