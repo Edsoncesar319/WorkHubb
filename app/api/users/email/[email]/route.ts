@@ -17,17 +17,28 @@ export async function GET(
     }
     return NextResponse.json(user);
   } catch (error: any) {
+    const realError = error?.cause || error;
+    const errorMessage = realError?.message || error?.message || '';
+    const errorCode = realError?.code || error?.code;
+    
     console.error('Error fetching user:', error);
     console.error('Error details:', {
-      message: error?.message,
-      code: error?.code,
+      message: errorMessage,
+      code: errorCode,
       stack: error?.stack
     });
+    
+    // Erro específico: tabelas não existem
+    if (errorCode === '42P01' || errorMessage.includes('does not exist') || errorMessage.includes('relation')) {
+      return NextResponse.json({ 
+        error: 'Database tables not created. Please execute scripts/create-postgres-tables.sql in Vercel Postgres console.',
+        code: 'TABLES_NOT_EXIST'
+      }, { status: 503 });
+    }
     
     // Se o erro for relacionado ao banco não estar disponível,
     // retornar 404 em vez de 500 para permitir que o registro continue
     // (assumindo que o email não existe se o banco não está disponível)
-    const errorMessage = error?.message || '';
     if (errorMessage.includes('not available') || 
         errorMessage.includes('not configured') ||
         errorMessage.includes('Vercel Postgres não configurado') ||
@@ -40,8 +51,8 @@ export async function GET(
     return NextResponse.json({ 
       error: errorMessage || 'Failed to fetch user',
       details: process.env.NODE_ENV === 'development' ? {
-        message: error?.message,
-        code: error?.code
+        message: errorMessage,
+        code: errorCode
       } : undefined
     }, { status: 500 });
   }
