@@ -37,23 +37,13 @@ export async function getUserByEmail(email: string): Promise<User | undefined> {
     const result = await database.select().from(users).where(eq(users.email, email)).limit(1);
     return result[0];
   } catch (error: any) {
-    const realError = error?.cause || error;
-    const errorMessage = realError?.message || error?.message;
-    const errorCode = realError?.code || error?.code;
-    
     console.error('Error in getUserByEmail:', error);
     console.error('Error details:', {
-      message: errorMessage,
-      code: errorCode,
+      message: error?.message,
+      code: error?.code,
       email: email
     });
-    
-    // Erro específico para tabela não existente
-    if (errorCode === '42P01' || errorMessage?.includes('does not exist') || errorMessage?.includes('relation')) {
-      throw new Error('Tabelas do banco de dados não foram criadas. Execute o script SQL em scripts/create-postgres-tables.sql no console do Postgres da Vercel.');
-    }
-    
-    throw new Error(errorMessage || 'Erro ao buscar usuário por email');
+    throw new Error(error?.message || 'Erro ao buscar usuário por email');
   }
 }
 
