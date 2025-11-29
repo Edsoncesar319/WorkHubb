@@ -33,13 +33,26 @@ const connectionString =
 
 const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL_ENV;
 
+// Detectar se estamos usando URLs do Prisma Accelerate
+const isPrismaAccelerateUrl = connectionString ? (
+  connectionString.includes('prisma.io') || 
+  connectionString.includes('prisma-data.net') ||
+  connectionString.startsWith('prisma+')
+) : false;
+
 function createDb(): Database {
   if (globalForDb.__workhubbDb) {
     return globalForDb.__workhubbDb;
   }
 
-  if (isVercel) {
-    console.log('Using Vercel Postgres (serverless mode)');
+  // Usar @vercel/postgres em produção OU quando detectar URLs do Prisma Accelerate
+  // porque @vercel/postgres funciona com essas URLs, mas postgres-js não
+  if (isVercel || isPrismaAccelerateUrl) {
+    if (isPrismaAccelerateUrl && !isVercel) {
+      console.log('Using @vercel/postgres (compatible with Prisma Accelerate URLs)');
+    } else {
+      console.log('Using Vercel Postgres (serverless mode)');
+    }
     const database = drizzleWithVercel(vercelSql, { schema });
     globalForDb.__workhubbDb = database;
     return database;
@@ -53,16 +66,9 @@ function createDb(): Database {
 
   // Log da configuração (sem expor a senha)
   const maskedUrl = connectionString.replace(/:[^:@]+@/, ':****@');
-  const isPrismaUrl = connectionString.includes('prisma.io') || connectionString.includes('prisma-data.net');
   
-  if (isPrismaUrl) {
-    console.warn('⚠️  ATENÇÃO: Usando URL do Prisma Accelerate. URLs do Prisma Accelerate podem não funcionar diretamente com postgres-js.');
-    console.warn('⚠️  Recomenda-se usar POSTGRES_URL_NON_POOLING que aponta diretamente para o Vercel Postgres.');
-  }
-  
-  console.log('Connecting to Postgres:', {
+  console.log('Connecting to Postgres (direct connection):', {
     url: maskedUrl,
-    isPrismaUrl,
     hasPostgresUrl: !!(process.env.POSTGRES_URL || process.env.WORKHUB_POSTGRES_URL),
     hasPostgresUrlNonPooling: !!(process.env.POSTGRES_URL_NON_POOLING || process.env.WORKHUB_POSTGRES_URL_NON_POOLING),
     hasDatabaseUrl: !!(process.env.DATABASE_URL || process.env.WORKHUB_DATABASE_URL),
@@ -72,28 +78,16 @@ function createDb(): Database {
   const maxConnections = Number.parseInt(process.env.POSTGRES_MAX_CONNECTIONS || '5', 10);
 
   try {
-    // Detectar se é uma URL do Prisma Accelerate
-    const isPrismaAccelerate = connectionString.includes('prisma.io') || connectionString.includes('prisma-data.net');
-    
-    // Para URLs do Prisma Accelerate, pode precisar de configuração especial
-    const sslConfig = disableSSL ? false : (isPrismaAccelerate ? 'require' : 'require');
-    
     const client = postgres(connectionString, {
-      ssl: sslConfig,
+      ssl: disableSSL ? false : 'require',
       max: Number.isNaN(maxConnections) ? 5 : maxConnections,
       onnotice: () => {}, // Silenciar avisos do Postgres
-      // Para Prisma Accelerate, pode precisar de configurações adicionais
-      ...(isPrismaAccelerate && {
-        connection: {
-          application_name: 'workhubb',
-        },
-      }),
     });
 
     globalForDb.__workhubbPgClient = client;
     const database = drizzleWithPostgresJs(client, { schema });
     globalForDb.__workhubbDb = database;
-    console.log('Postgres connection established successfully', { isPrismaAccelerate });
+    console.log('Postgres connection established successfully (direct)');
     return database;
   } catch (error: any) {
     console.error('Failed to create Postgres connection:', {
@@ -104,19 +98,6 @@ function createDb(): Database {
     });
     
     const errorMsg = error?.cause?.message || error?.message || 'Erro desconhecido';
-    
-    // Mensagem específica para erros do Prisma Accelerate
-    if (errorMsg.includes('Failed to identify your database') || 
-        errorMsg.includes('A server error occurred') ||
-        connectionString.includes('prisma.io') ||
-        connectionString.includes('prisma-data.net')) {
-      throw new Error(
-        `Erro: URLs do Prisma Accelerate (db.prisma.io) não funcionam diretamente com postgres-js. ` +
-        `Use POSTGRES_URL_NON_POOLING que aponta diretamente para o Vercel Postgres. ` +
-        `Execute 'vercel env pull .env.development.local' para atualizar as variáveis.`
-      );
-    }
-    
     throw new Error(
       `Erro ao conectar ao Postgres: ${errorMsg}. Verifique se a URL de conexão está correta.`
     );
