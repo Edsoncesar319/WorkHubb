@@ -46,7 +46,6 @@
     "@vercel/blob": "^2.0.0",
     "@vercel/postgres": "^0.10.0",
     "autoprefixer": "^10.4.20",
-    "better-sqlite3": "^12.4.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
@@ -73,7 +72,6 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.9",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",

@@ -50,18 +50,18 @@ checks.push({
   message: '❌ lib/db/index.ts não encontrado'
 });
 
-// Verificar se lib/db/schema-pg.ts existe (necessário para Postgres)
-checks.push({
-  name: 'lib/db/schema-pg.ts',
-  check: () => existsSync('lib/db/schema-pg.ts'),
-  message: '❌ lib/db/schema-pg.ts não encontrado (necessário para Postgres)'
-});
-
 // Verificar se scripts/create-postgres-tables.sql existe
 checks.push({
   name: 'scripts/create-postgres-tables.sql',
   check: () => existsSync('scripts/create-postgres-tables.sql'),
   message: '❌ scripts/create-postgres-tables.sql não encontrado'
+});
+
+// Verificar se scripts/sync-postgres.ts existe
+checks.push({
+  name: 'scripts/sync-postgres.ts',
+  check: () => existsSync('scripts/sync-postgres.ts'),
+  message: '❌ scripts/sync-postgres.ts não encontrado'
 });
 
 console.log('🔍 Verificando configuração para deploy na Vercel...\n');

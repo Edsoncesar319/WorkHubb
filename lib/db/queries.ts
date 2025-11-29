@@ -60,7 +60,8 @@ export async function createUser(user: NewUser): Promise<User> {
     }
 
     // Garantir que campos opcionais sejam null ao invés de undefined
-    const userData = {
+    // createdAt não precisa ser passado pois tem defaultNow() no schema
+    const userData: any = {
       id: user.id,
       name: user.name,
       email: user.email,
@@ -71,7 +72,6 @@ export async function createUser(user: NewUser): Promise<User> {
       linkedin: user.linkedin ?? null,
       company: user.company ?? null,
       profilePhoto: user.profilePhoto ?? null,
-      createdAt: user.createdAt || new Date().toISOString(),
     };
     
     console.log('Creating user with data:', {
@@ -95,30 +95,43 @@ export async function createUser(user: NewUser): Promise<User> {
     return result[0];
   } catch (error: any) {
     console.error('Error in createUser:', error);
+    
+    // Extrair o erro real se estiver aninhado
+    const realError = error?.cause || error;
+    const errorMessage = realError?.message || error?.message;
+    const errorCode = realError?.code || error?.code;
+    
     console.error('Error details:', {
-      message: error?.message,
-      code: error?.code,
-      errno: error?.errno,
-      sql: error?.sql,
+      message: errorMessage,
+      code: errorCode,
+      errno: realError?.errno || error?.errno,
+      sql: realError?.sql || error?.sql,
+      name: realError?.name || error?.name,
       stack: error?.stack
     });
     
     // Re-throw com mensagem mais clara
-    if (error?.code === 'SQLITE_CONSTRAINT_UNIQUE' || error?.errno === 19) {
+    if (errorCode === '23505' || errorMessage?.includes('duplicate key value')) {
       throw new Error('Este email já está cadastrado');
     }
     
-    // Se for erro de constraint, tentar identificar qual campo
-    if (error?.message?.includes('UNIQUE constraint')) {
-      throw new Error('Este email já está cadastrado');
+    // Erros de conexão/banco
+    if (errorMessage?.includes('Failed to identify your database') || 
+        errorMessage?.includes('A server error occurred') ||
+        errorMessage?.includes('connection') ||
+        errorMessage?.includes('ECONNREFUSED')) {
+      throw new Error('Erro de conexão com o banco de dados. Verifique se o Postgres está configurado corretamente e se as variáveis POSTGRES_URL estão definidas.');
     }
     
     // Se for erro de banco não disponível
-    if (error?.message?.includes('Database not available')) {
+    if (errorMessage?.includes('Database not available') || 
+        errorMessage?.includes('Postgres não configurado')) {
       throw new Error('Banco de dados não está disponível. Verifique a configuração.');
     }
     
-    throw new Error(error?.message || 'Erro ao criar usuário no banco de dados');
+    // Mensagem genérica com detalhes úteis
+    const finalMessage = errorMessage || 'Erro ao criar usuário no banco de dados';
+    throw new Error(finalMessage);
   }
 }
 
@@ -190,8 +203,8 @@ export async function updateJob(id: string, job: Partial<NewJob>): Promise<Job |
 
 export async function deleteJob(id: string): Promise<boolean> {
   const database = await getDb();
-  const result = await database.delete(jobs).where(eq(jobs.id, id));
-  return result.changes > 0;
+  const result = await database.delete(jobs).where(eq(jobs.id, id)).returning({ id: jobs.id });
+  return result.length > 0;
 }
 
 // Funções para candidaturas
@@ -279,6 +292,6 @@ export async function updateExperience(id: string, experience: Partial<NewExperi
 
 export async function deleteExperience(id: string): Promise<boolean> {
   const database = await getDb();
-  const result = await database.delete(experiences).where(eq(experiences.id, id));
-  return result.changes > 0;
+  const result = await database.delete(experiences).where(eq(experiences.id, id)).returning({ id: experiences.id });
+  return result.length > 0;
 }

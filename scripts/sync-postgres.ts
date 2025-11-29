@@ -30,15 +30,42 @@ function loadEnvFile(filename: string) {
 
 ['.env.development.local', '.env.local', '.env'].forEach(loadEnvFile);
 
+// Priorizar URLs que NÃO sejam do Prisma Accelerate (db.prisma.io)
+// Verificar variáveis padrão e com prefixo WORKHUB_
 const connectionString =
-  process.env.POSTGRES_URL ||
+  // Priorizar URLs que NÃO sejam do Prisma Accelerate
+  [process.env.POSTGRES_URL_NON_POOLING, 
+   process.env.WORKHUB_POSTGRES_URL_NON_POOLING,
+   process.env.POSTGRES_URL,
+   process.env.WORKHUB_POSTGRES_URL,
+   process.env.DATABASE_URL,
+   process.env.WORKHUB_DATABASE_URL]
+    .find(url => url && !url.includes('prisma.io') && !url.includes('prisma-data.net') && !url.startsWith('prisma+')) ||
+  // Se não encontrou URL direta, usar qualquer uma disponível
   process.env.POSTGRES_URL_NON_POOLING ||
-  process.env.DATABASE_URL;
+  process.env.WORKHUB_POSTGRES_URL_NON_POOLING ||
+  process.env.POSTGRES_URL ||
+  process.env.WORKHUB_POSTGRES_URL ||
+  process.env.DATABASE_URL ||
+  process.env.WORKHUB_DATABASE_URL;
 
 if (!connectionString) {
-  console.error('❌ Nenhuma variável POSTGRES_URL/POSTGRES_URL_NON_POOLING/DATABASE_URL encontrada.');
-  console.error('Execute `vercel env pull` ou defina manualmente antes de rodar este script.');
+  console.error('❌ Nenhuma variável POSTGRES_URL encontrada.');
+  console.error('Variáveis verificadas:');
+  console.error('  - POSTGRES_URL_NON_POOLING:', !!process.env.POSTGRES_URL_NON_POOLING);
+  console.error('  - WORKHUB_POSTGRES_URL_NON_POOLING:', !!process.env.WORKHUB_POSTGRES_URL_NON_POOLING);
+  console.error('  - POSTGRES_URL:', !!process.env.POSTGRES_URL);
+  console.error('  - WORKHUB_POSTGRES_URL:', !!process.env.WORKHUB_POSTGRES_URL);
+  console.error('  - DATABASE_URL:', !!process.env.DATABASE_URL);
+  console.error('  - WORKHUB_DATABASE_URL:', !!process.env.WORKHUB_DATABASE_URL);
+  console.error('\nExecute `vercel env pull .env.development.local` ou defina manualmente antes de rodar este script.');
   process.exit(1);
+}
+
+const isPrismaUrl = connectionString.includes('prisma.io') || connectionString.includes('prisma-data.net');
+if (isPrismaUrl) {
+  console.warn('⚠️  ATENÇÃO: Usando URL do Prisma Accelerate. Isso pode não funcionar.');
+  console.warn('⚠️  Recomenda-se usar POSTGRES_URL_NON_POOLING que aponta diretamente para o Vercel Postgres.');
 }
 
 const sqlFilePath = path.resolve(process.cwd(), 'scripts/create-postgres-tables.sql');
@@ -59,7 +86,8 @@ const statements = sanitizedContent
   .filter(Boolean);
 
 async function main() {
-  const sql = postgres(connectionString, { ssl: 'require' });
+  const disableSSL = process.env.POSTGRES_DISABLE_SSL === '1';
+  const sql = postgres(connectionString, { ssl: disableSSL ? false : 'require' });
   let executed = 0;
 
   try {

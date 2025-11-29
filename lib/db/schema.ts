@@ -1,8 +1,7 @@
-import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
-import { sql } from 'drizzle-orm';
+import { pgTable, text, boolean, timestamp } from 'drizzle-orm/pg-core';
 
-// Tabela de usuários
-export const users = sqliteTable('users', {
+// Tabela de usuários (Postgres)
+export const users = pgTable('users', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   email: text('email').notNull().unique(),
@@ -13,34 +12,34 @@ export const users = sqliteTable('users', {
   linkedin: text('linkedin'),
   company: text('company'),
   profilePhoto: text('profile_photo'),
-  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 // Tabela de vagas
-export const jobs = sqliteTable('jobs', {
+export const jobs = pgTable('jobs', {
   id: text('id').primaryKey(),
   title: text('title').notNull(),
   company: text('company').notNull(),
   location: text('location').notNull(),
-  remote: integer('remote', { mode: 'boolean' }).notNull(),
+  remote: boolean('remote').notNull(),
   salary: text('salary'),
   description: text('description').notNull(),
-  requirements: text('requirements', { mode: 'json' }).notNull(), // Array de strings
+  requirements: text('requirements').notNull(), // JSON string
   authorId: text('author_id').notNull().references(() => users.id),
-  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 // Tabela de candidaturas
-export const applications = sqliteTable('applications', {
+export const applications = pgTable('applications', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id),
   jobId: text('job_id').notNull().references(() => jobs.id),
   message: text('message').notNull(),
-  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 // Tabela de experiências profissionais
-export const experiences = sqliteTable('experiences', {
+export const experiences = pgTable('experiences', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id),
   title: text('title').notNull(),
@@ -48,9 +47,9 @@ export const experiences = sqliteTable('experiences', {
   location: text('location'),
   startDate: text('start_date').notNull(),
   endDate: text('end_date'),
-  current: integer('current', { mode: 'boolean' }).default(false).notNull(),
+  current: boolean('current').default(false).notNull(),
   description: text('description'),
-  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 // Tipos TypeScript derivados dos schemas

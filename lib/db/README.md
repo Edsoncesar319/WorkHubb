@@ -1,83 +1,41 @@
-# Banco de Dados SQLite - WorkHubb
+# Banco de Dados Postgres - WorkHubb
 
-Este diretório contém toda a configuração e estrutura do banco de dados SQLite para o projeto WorkHubb.
+Este diretório contém toda a configuração e estrutura do banco de dados Postgres utilizado pelo WorkHubb em desenvolvimento e produção.
 
 ## Estrutura
 
-- `index.ts` - Configuração principal do banco de dados
-- `schema.ts` - Definição das tabelas e tipos
-- `queries.ts` - Funções de acesso aos dados
-- `seed.ts` - Script para popular o banco com dados iniciais
-- `migrations/` - Diretório com as migrações do banco
+- `index.ts` – inicializa o Drizzle usando `@vercel/postgres` (na Vercel) ou `postgres` (local)
+- `schema.ts` – definição das tabelas usando `pg-core`
+- `queries.ts` – funções de leitura/escrita utilizadas pelas rotas da API
+- `seed.ts` – script para popular o banco com dados iniciais
+- `migrations/` – migrações geradas via `drizzle-kit`
 
-## Scripts Disponíveis
+## Scripts disponíveis
 
 ```bash
-# Gerar migrações
-npm run db:generate
-
-# Aplicar migrações
-npm run db:migrate
-
-# Popular banco com dados iniciais
-npm run db:seed
-
-# Abrir Drizzle Studio (interface visual)
-npm run db:studio
+npm run db:generate       # gera migrações a partir do schema
+npm run db:migrate        # aplica migrações no Postgres configurado
+npm run db:seed           # popula o banco com dados de exemplo
+npm run db:studio         # abre o Drizzle Studio
+npm run db:sync:postgres  # executa scripts/create-postgres-tables.sql diretamente no Postgres
 ```
 
-## Tabelas
+> Todas as operações exigem que `POSTGRES_URL` (ou equivalentes) estejam configuradas. Utilize `vercel env pull .env.development.local` para sincronizar as variáveis em desenvolvimento.
 
-### users
-- `id` (TEXT, PRIMARY KEY)
-- `name` (TEXT, NOT NULL)
-- `email` (TEXT, NOT NULL, UNIQUE)
-- `type` (TEXT, ENUM: 'professional' | 'company')
-- `bio` (TEXT, OPTIONAL)
-- `stack` (TEXT, OPTIONAL)
-- `github` (TEXT, OPTIONAL)
-- `linkedin` (TEXT, OPTIONAL)
-- `company` (TEXT, OPTIONAL)
-- `created_at` (TEXT, DEFAULT: CURRENT_TIMESTAMP)
+## Tabelas principais
 
-### jobs
-- `id` (TEXT, PRIMARY KEY)
-- `title` (TEXT, NOT NULL)
-- `company` (TEXT, NOT NULL)
-- `location` (TEXT, NOT NULL)
-- `remote` (INTEGER, BOOLEAN, NOT NULL)
-- `salary` (TEXT, OPTIONAL)
-- `description` (TEXT, NOT NULL)
-- `requirements` (TEXT, JSON, NOT NULL)
-- `author_id` (TEXT, NOT NULL, FOREIGN KEY -> users.id)
-- `created_at` (TEXT, DEFAULT: CURRENT_TIMESTAMP)
+- `users`: dados de profissionais/empresas, com campos opcionais (`bio`, `stack`, etc.) e `profile_photo`.
+- `jobs`: vagas publicadas. O campo `requirements` é armazenado como string JSON para manter compatibilidade com dados existentes.
+- `applications`: candidaturas relacionando usuários e vagas.
+- `experiences`: histórico profissional associado a um usuário.
 
-### applications
-- `id` (TEXT, PRIMARY KEY)
-- `user_id` (TEXT, NOT NULL, FOREIGN KEY -> users.id)
-- `job_id` (TEXT, NOT NULL, FOREIGN KEY -> jobs.id)
-- `message` (TEXT, NOT NULL)
-- `created_at` (TEXT, DEFAULT: CURRENT_TIMESTAMP)
+Todos os timestamps usam `CURRENT_TIMESTAMP` como padrão. Flags booleanas utilizam `BOOLEAN` nativo do Postgres.
 
-## Uso
+## Fluxo recomendado
 
-As funções de acesso aos dados estão disponíveis em `lib/data.ts` e são compatíveis com a interface anterior do localStorage, mas agora usam o banco SQLite.
+1. Configure `POSTGRES_URL`, `POSTGRES_URL_NON_POOLING` e `POSTGRES_PRISMA_URL`.
+2. Rode `npm run db:sync:postgres` (ou `npm run db:migrate`) para garantir que o schema está aplicado.
+3. Utilize as funções de `lib/db/queries.ts` nas rotas e serviços.
 
-Exemplo:
-```typescript
-import { getJobs, addJob } from '@/lib/data'
+Para instruções detalhadas sobre provisionamento, consulte `../../VERCEL_POSTGRES_SETUP.md`.
 
-// Buscar todas as vagas
-const jobs = await getJobs()
-
-// Adicionar nova vaga
-const newJob = await addJob({
-  title: 'Desenvolvedor React',
-  company: 'Minha Empresa',
-  location: 'São Paulo, SP',
-  remote: true,
-  description: 'Vaga para desenvolvedor React',
-  requirements: ['React', 'TypeScript', '3+ anos'],
-  authorId: 'user123'
-})
-```

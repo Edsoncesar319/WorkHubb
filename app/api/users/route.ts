@@ -69,7 +69,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Garantir que campos opcionais sejam null ao invés de undefined
-    const userData = {
+    // createdAt não precisa ser passado pois tem defaultNow() no schema
+    const userData: any = {
       id: String(body.id),
       name: String(body.name).trim(),
       email: String(body.email).trim().toLowerCase(),
@@ -80,7 +81,6 @@ export async function POST(request: NextRequest) {
       linkedin: body.linkedin ? String(body.linkedin).trim() : null,
       company: body.company ? String(body.company).trim() : null,
       profilePhoto: body.profilePhoto ? String(body.profilePhoto).trim() : null,
-      createdAt: body.createdAt || new Date().toISOString(),
     };
 
     console.log('Creating user with processed data:', {
@@ -105,33 +105,54 @@ export async function POST(request: NextRequest) {
       body: body
     });
     
+    // Extrair o erro real se estiver aninhado
+    const realError = error?.cause || error;
+    const errorMsg = realError?.message || error?.message || '';
+    const errorCode = realError?.code || error?.code;
+    
     // Retornar mensagem de erro mais detalhada
     let errorMessage = 'Erro ao criar usuário';
     let statusCode = 500;
     
-    if (error?.code === 'SQLITE_CONSTRAINT_UNIQUE' || error?.errno === 19) {
+    if (errorCode === '23505' || errorMsg?.includes('duplicate key value')) {
       errorMessage = 'Este email já está cadastrado';
       statusCode = 409;
-    } else if (error?.message?.includes('UNIQUE constraint')) {
-      errorMessage = 'Este email já está cadastrado';
-      statusCode = 409;
-    } else if (error?.message?.includes('Database not available')) {
+    } else if (errorMsg?.includes('Failed to identify your database') || 
+               errorMsg?.includes('A server error occurred') ||
+               errorMsg?.includes('connection') ||
+               errorMsg?.includes('ECONNREFUSED')) {
+      errorMessage = 'Erro de conexão com o banco de dados. Verifique se o Postgres está configurado corretamente.';
+      statusCode = 503;
+    } else if (errorMsg?.includes('Database not available') || 
+               errorMsg?.includes('Postgres não configurado')) {
       errorMessage = 'Banco de dados não está disponível. Verifique a configuração.';
       statusCode = 503;
-    } else if (error?.message) {
-      errorMessage = error.message;
-    } else if (error?.toString) {
+    } else if (errorMsg?.includes('toISOString')) {
+      errorMessage = 'Erro ao processar data. Tente novamente.';
+      statusCode = 500;
+    } else if (errorMsg) {
+      errorMessage = String(errorMsg);
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    } else if (error?.toString && typeof error.toString === 'function') {
       errorMessage = error.toString();
     }
     
-    return NextResponse.json({ 
-      error: errorMessage,
-      details: process.env.NODE_ENV === 'development' ? {
+    // Garantir que sempre retornamos um objeto válido
+    const errorResponse: { error: string; details?: any } = { 
+      error: errorMessage || 'Erro desconhecido ao criar usuário'
+    };
+    
+    if (process.env.NODE_ENV === 'development') {
+      errorResponse.details = {
         message: error?.message,
         code: error?.code,
         errno: error?.errno,
-        sql: error?.sql
-      } : undefined
-    }, { status: statusCode });
+        sql: error?.sql,
+        stack: error?.stack?.substring(0, 500) // Limitar tamanho do stack trace
+      };
+    }
+    
+    return NextResponse.json(errorResponse, { status: statusCode });
   }
 }

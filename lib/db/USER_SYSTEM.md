@@ -2,7 +2,7 @@
 
 ## ✅ Status: FUNCIONANDO PERFEITAMENTE
 
-O sistema de cadastro e autenticação de usuários foi completamente integrado com o banco de dados SQLite.
+O sistema de cadastro e autenticação de usuários foi completamente integrado com o banco de dados Postgres (Vercel Postgres).
 
 ## 🏗️ Arquitetura
 
@@ -90,4 +90,4 @@ const newCompany = {
 
 **SISTEMA COMPLETAMENTE FUNCIONAL** ✅
 
-O cadastro de usuários profissionais e empresas está funcionando perfeitamente com o banco de dados SQLite. Todas as funcionalidades foram testadas e validadas.
+O cadastro de usuários profissionais e empresas está funcionando perfeitamente com o banco de dados Postgres. Todas as funcionalidades foram testadas e validadas.

@@ -2,9 +2,7 @@
 
 ## 🎯 Por que Vercel Postgres?
 
-O SQLite não funciona em ambientes serverless como a Vercel. Este projeto agora suporta automaticamente:
-- **SQLite** para desenvolvimento local
-- **Vercel Postgres** para produção na Vercel
+Toda a camada de dados do WorkHubb agora roda exclusivamente em Postgres. A Vercel já fornece um Postgres gerenciado que funciona tanto para produção quanto para desenvolvimento (via `vercel env pull`). Isso garante compatibilidade total com o ambiente serverless.
 
 ## 📋 Passo a Passo
 
@@ -93,24 +91,33 @@ npm run db:generate
 # Aplicar migrações (adaptar para PostgreSQL)
 ```
 
-### 4. Verificar Configuração
+### 4. Sincronizar variáveis localmente
 
-A variável `POSTGRES_URL` deve estar automaticamente disponível no seu projeto Vercel. Para verificar:
+Rode:
 
-1. No dashboard do projeto Vercel, vá em **Settings** > **Environment Variables**
-2. Você deve ver `POSTGRES_URL` listada
+```bash
+vercel env pull .env.development.local
+```
+
+Isso garante que `POSTGRES_URL`, `POSTGRES_URL_NON_POOLING` e `POSTGRES_PRISMA_URL` fiquem disponíveis localmente.
 
 ## ✅ Como Funciona
 
 O sistema detecta automaticamente:
-- Se `VERCEL=1` e `POSTGRES_URL` existe → usa Vercel Postgres
-- Caso contrário → usa SQLite (desenvolvimento local)
+- Se estiver rodando na Vercel (`VERCEL=1`): usa `@vercel/postgres`
+- Em desenvolvimento: usa `postgres` com a string definida em `POSTGRES_URL` (ou equivalentes). Sem essas variáveis, a aplicação não sobe.
 
 ## 🔧 Desenvolvimento Local
 
-Para desenvolvimento local, você pode:
-1. Continuar usando SQLite (padrão)
-2. Ou configurar `POSTGRES_URL` no `.env.local` para usar Postgres localmente
+Use a mesma instância do Postgres (via `vercel env pull`) ou configure um Postgres local e exporte suas credenciais para as variáveis:
+
+```env
+POSTGRES_URL=postgresql://user:pass@localhost:5432/workhubb
+POSTGRES_URL_NON_POOLING=postgresql://user:pass@localhost:5432/workhubb
+POSTGRES_PRISMA_URL=postgresql://user:pass@localhost:5432/workhubb
+```
+
+Se o seu Postgres local não usa TLS, defina `POSTGRES_DISABLE_SSL=1`.
 
 ## 📊 Monitoramento
 

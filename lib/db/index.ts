@@ -1,185 +1,142 @@
+import { drizzle as drizzleWithVercel, type VercelPgDatabase } from 'drizzle-orm/vercel-postgres';
+import { drizzle as drizzleWithPostgresJs, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import { sql as vercelSql } from '@vercel/postgres';
+import postgres from 'postgres';
 import * as schema from './schema';
 
-// Detectar ambiente
+type Database = VercelPgDatabase<typeof schema> | PostgresJsDatabase<typeof schema>;
+
+const globalForDb = globalThis as typeof globalThis & {
+  __workhubbDb?: Database;
+  __workhubbPgClient?: ReturnType<typeof postgres>;
+};
+
+// Priorizar URLs não-pooling para desenvolvimento local
+// URLs do Prisma Accelerate (db.prisma.io) não funcionam com postgres-js diretamente
+// Verificar variáveis padrão e com prefixo WORKHUB_
+const connectionString =
+  // Priorizar URLs que NÃO sejam do Prisma Accelerate
+  [process.env.POSTGRES_URL_NON_POOLING, 
+   process.env.WORKHUB_POSTGRES_URL_NON_POOLING,
+   process.env.POSTGRES_URL,
+   process.env.WORKHUB_POSTGRES_URL,
+   process.env.DATABASE_URL,
+   process.env.WORKHUB_DATABASE_URL]
+    .find(url => url && !url.includes('prisma.io') && !url.includes('prisma-data.net') && !url.startsWith('prisma+')) ||
+  // Se não encontrou URL direta, usar qualquer uma (mas vai dar erro depois)
+  process.env.POSTGRES_URL_NON_POOLING ||
+  process.env.WORKHUB_POSTGRES_URL_NON_POOLING ||
+  process.env.POSTGRES_URL ||
+  process.env.WORKHUB_POSTGRES_URL ||
+  process.env.DATABASE_URL ||
+  process.env.WORKHUB_DATABASE_URL;
+
 const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL_ENV;
-// A Vercel pode usar diferentes variáveis para Postgres
-const hasPostgresUrl = !!(
-  process.env.POSTGRES_URL || 
-  process.env.POSTGRES_URL_NON_POOLING || 
-  process.env.POSTGRES_PRISMA_URL ||
-  process.env.DATABASE_URL
-);
 
-// Lazy loading do banco de dados
-let dbInstance: any = null;
-let initPromise: Promise<any> | null = null;
-
-async function initDb() {
-  if (initPromise) {
-    return initPromise;
+function createDb(): Database {
+  if (globalForDb.__workhubbDb) {
+    return globalForDb.__workhubbDb;
   }
 
-  initPromise = (async () => {
-    if (dbInstance) {
-      return dbInstance;
-    }
+  if (isVercel) {
+    console.log('Using Vercel Postgres (serverless mode)');
+    const database = drizzleWithVercel(vercelSql, { schema });
+    globalForDb.__workhubbDb = database;
+    return database;
+  }
 
-    try {
-      // Se estiver na Vercel e tiver POSTGRES_URL, usar Postgres
-      if (isVercel && hasPostgresUrl) {
-        console.log('Initializing Vercel Postgres database...');
-        console.log('Postgres environment variables:', {
-          hasPostgresUrl: !!process.env.POSTGRES_URL,
-          hasPostgresUrlNonPooling: !!process.env.POSTGRES_URL_NON_POOLING,
-          hasPostgresPrismaUrl: !!process.env.POSTGRES_PRISMA_URL,
-          hasDatabaseUrl: !!process.env.DATABASE_URL,
-        });
-        
-        const { drizzle } = await import('drizzle-orm/vercel-postgres');
-        const { sql } = await import('@vercel/postgres');
-        
-        // Importar schema PostgreSQL
-        const pgSchema = await import('./schema-pg');
-        
-        dbInstance = drizzle(sql, { schema: pgSchema });
-        console.log('Vercel Postgres initialized successfully');
-        return dbInstance;
-      }
-      
-      // Caso contrário, usar SQLite (desenvolvimento local)
-      console.log('Initializing SQLite database...');
-      
-      const { drizzle } = await import('drizzle-orm/better-sqlite3');
-      const Database = require('better-sqlite3');
-      const path = require('path');
-      const fs = require('fs');
-      
-      const dbPath = './lib/db/workhubb.db';
-      const absolutePath = path.resolve(process.cwd(), dbPath);
-      
-      console.log('Database path:', absolutePath);
-      
-      // Verificar se o diretório existe
-      const dbDir = path.dirname(absolutePath);
-      if (!fs.existsSync(dbDir)) {
-        fs.mkdirSync(dbDir, { recursive: true });
-      }
-      
-      const sqliteInstance = new Database(absolutePath);
-      dbInstance = drizzle(sqliteInstance, { schema });
-      console.log('SQLite initialized successfully');
-      return dbInstance;
-    } catch (error: any) {
-      console.error('Error initializing database:', error);
-      console.error('Error details:', {
-        message: error?.message,
-        code: error?.code,
-        isVercel,
-        hasPostgresUrl,
-        postgresUrl: hasPostgresUrl ? 'configured' : 'not set',
-        envVars: {
-          VERCEL: process.env.VERCEL,
-          VERCEL_ENV: process.env.VERCEL_ENV,
-          POSTGRES_URL: process.env.POSTGRES_URL ? 'set' : 'not set',
-          POSTGRES_URL_NON_POOLING: process.env.POSTGRES_URL_NON_POOLING ? 'set' : 'not set',
-          POSTGRES_PRISMA_URL: process.env.POSTGRES_PRISMA_URL ? 'set' : 'not set',
-          DATABASE_URL: process.env.DATABASE_URL ? 'set' : 'not set',
-        }
-      });
-      
-      if (isVercel && !hasPostgresUrl) {
-        const errorMsg = 
-          'Vercel Postgres não configurado.\n\n' +
-          'Para configurar:\n' +
-          '1. Acesse https://vercel.com/dashboard\n' +
-          '2. Vá em Storage > Create Database > Postgres\n' +
-          '3. Crie o banco e conecte ao seu projeto\n' +
-          '4. Execute o SQL em scripts/create-postgres-tables.sql\n\n' +
-          'Veja DEPLOY_GUIDE.md para instruções detalhadas.';
-        throw new Error(errorMsg);
-      }
-      
-      throw error;
-    }
-  })();
+  if (!connectionString) {
+    throw new Error(
+      'Postgres não configurado. Defina POSTGRES_URL (ou DATABASE_URL/POSTGRES_URL_NON_POOLING) no ambiente local.'
+    );
+  }
 
-  return initPromise;
+  // Log da configuração (sem expor a senha)
+  const maskedUrl = connectionString.replace(/:[^:@]+@/, ':****@');
+  const isPrismaUrl = connectionString.includes('prisma.io') || connectionString.includes('prisma-data.net');
+  
+  if (isPrismaUrl) {
+    console.warn('⚠️  ATENÇÃO: Usando URL do Prisma Accelerate. URLs do Prisma Accelerate podem não funcionar diretamente com postgres-js.');
+    console.warn('⚠️  Recomenda-se usar POSTGRES_URL_NON_POOLING que aponta diretamente para o Vercel Postgres.');
+  }
+  
+  console.log('Connecting to Postgres:', {
+    url: maskedUrl,
+    isPrismaUrl,
+    hasPostgresUrl: !!(process.env.POSTGRES_URL || process.env.WORKHUB_POSTGRES_URL),
+    hasPostgresUrlNonPooling: !!(process.env.POSTGRES_URL_NON_POOLING || process.env.WORKHUB_POSTGRES_URL_NON_POOLING),
+    hasDatabaseUrl: !!(process.env.DATABASE_URL || process.env.WORKHUB_DATABASE_URL),
+  });
+
+  const disableSSL = process.env.POSTGRES_DISABLE_SSL === '1';
+  const maxConnections = Number.parseInt(process.env.POSTGRES_MAX_CONNECTIONS || '5', 10);
+
+  try {
+    // Detectar se é uma URL do Prisma Accelerate
+    const isPrismaAccelerate = connectionString.includes('prisma.io') || connectionString.includes('prisma-data.net');
+    
+    // Para URLs do Prisma Accelerate, pode precisar de configuração especial
+    const sslConfig = disableSSL ? false : (isPrismaAccelerate ? 'require' : 'require');
+    
+    const client = postgres(connectionString, {
+      ssl: sslConfig,
+      max: Number.isNaN(maxConnections) ? 5 : maxConnections,
+      onnotice: () => {}, // Silenciar avisos do Postgres
+      // Para Prisma Accelerate, pode precisar de configurações adicionais
+      ...(isPrismaAccelerate && {
+        connection: {
+          application_name: 'workhubb',
+        },
+      }),
+    });
+
+    globalForDb.__workhubbPgClient = client;
+    const database = drizzleWithPostgresJs(client, { schema });
+    globalForDb.__workhubbDb = database;
+    console.log('Postgres connection established successfully', { isPrismaAccelerate });
+    return database;
+  } catch (error: any) {
+    console.error('Failed to create Postgres connection:', {
+      message: error?.message,
+      code: error?.code,
+      name: error?.name,
+      cause: error?.cause?.message,
+    });
+    
+    const errorMsg = error?.cause?.message || error?.message || 'Erro desconhecido';
+    
+    // Mensagem específica para erros do Prisma Accelerate
+    if (errorMsg.includes('Failed to identify your database') || 
+        errorMsg.includes('A server error occurred') ||
+        connectionString.includes('prisma.io') ||
+        connectionString.includes('prisma-data.net')) {
+      throw new Error(
+        `Erro: URLs do Prisma Accelerate (db.prisma.io) não funcionam diretamente com postgres-js. ` +
+        `Use POSTGRES_URL_NON_POOLING que aponta diretamente para o Vercel Postgres. ` +
+        `Execute 'vercel env pull .env.development.local' para atualizar as variáveis.`
+      );
+    }
+    
+    throw new Error(
+      `Erro ao conectar ao Postgres: ${errorMsg}. Verifique se a URL de conexão está correta.`
+    );
+  }
 }
 
-// Função para garantir que o banco está inicializado
-export async function ensureDbInitialized() {
-  if (!dbInstance) {
-    await initDb();
-  }
+const dbInstance = createDb();
+
+export async function ensureDbInitialized(): Promise<Database> {
   return dbInstance;
 }
 
-// Para SQLite, podemos inicializar de forma síncrona
-function initDbSync() {
-  if (dbInstance) {
-    return dbInstance;
-  }
-
-  try {
-    const { drizzle } = require('drizzle-orm/better-sqlite3');
-    const Database = require('better-sqlite3');
-    const path = require('path');
-    const fs = require('fs');
-    
-    const dbPath = './lib/db/workhubb.db';
-    const absolutePath = path.resolve(process.cwd(), dbPath);
-    
-    const dbDir = path.dirname(absolutePath);
-    if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir, { recursive: true });
-    }
-    
-    const sqliteInstance = new Database(absolutePath);
-    dbInstance = drizzle(sqliteInstance, { schema });
-    return dbInstance;
-  } catch (error: any) {
-    console.error('Error initializing SQLite synchronously:', error);
-    throw error;
+export async function closeDb() {
+  if (globalForDb.__workhubbPgClient) {
+    await globalForDb.__workhubbPgClient.end({ timeout: 5 });
+    globalForDb.__workhubbPgClient = undefined;
+    globalForDb.__workhubbDb = undefined;
   }
 }
 
-// Exporta o banco de dados
-// Para SQLite (desenvolvimento), inicializa de forma síncrona
-// Para Postgres (produção), precisa ser inicializado de forma assíncrona
-export const db = (() => {
-  // Se for SQLite, inicializar agora
-  if (!isVercel || !hasPostgresUrl) {
-    try {
-      return initDbSync();
-    } catch (error) {
-      console.error('Failed to initialize SQLite:', error);
-      // Retornar um objeto proxy que vai tentar inicializar quando usado
-    }
-  }
-  
-  // Para Postgres ou se SQLite falhou, retornar um proxy
-  return new Proxy({} as any, {
-    get(target, prop) {
-      if (dbInstance) {
-        const value = (dbInstance as any)[prop];
-        if (typeof value === 'function') {
-          return value.bind(dbInstance);
-        }
-        return value;
-      }
-      
-      // Se não temos instância, retornar uma função que inicializa e chama
-      return async function(...args: any[]) {
-        const db = await ensureDbInitialized();
-        const method = (db as any)[prop];
-        if (typeof method === 'function') {
-          return method.apply(db, args);
-        }
-        return method;
-      };
-    }
-  });
-})();
+export const db = dbInstance;
 
-// Exporta o schema
 export * from './schema';

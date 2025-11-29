@@ -26,7 +26,7 @@ O WorkHubb é uma aplicação web desenvolvida em Next.js que facilita a conexã
 - **Icons**: Lucide React
 - **Forms**: React Hook Form, Zod
 - **State Management**: React Hooks
-- **Database**: SQLite (desenvolvimento) / Vercel Postgres (produção) - **Detecção automática**
+- **Database**: Vercel Postgres (produção e desenvolvimento)
 - **File Storage**: Vercel Blob (fotos de perfil)
 
 ## 📦 Instalação e Execução
@@ -50,21 +50,23 @@ O WorkHubb é uma aplicação web desenvolvida em Next.js que facilita a conexã
    yarn install
    ```
 
-3. **Configure as variáveis de ambiente (Opcional)**
+3. **Configure as variáveis de ambiente**
    
-   Crie um arquivo `.env.local` na raiz do projeto:
+   Crie um arquivo `.env.local` (ou use `.env.development.local`) na raiz do projeto e preencha com o Postgres provisionado pela Vercel:
    ```env
-   # Opcional: Token do Vercel Blob para upload de fotos de perfil
+   # Token do Vercel Blob para upload de fotos de perfil (opcional)
    # Obtenha em: https://vercel.com/dashboard > Storage > Blob > Settings
    BLOB_READ_WRITE_TOKEN=vercel_blob_rw_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
    
-   # Opcional: Para usar Postgres localmente (padrão: SQLite)
-   # POSTGRES_URL=postgresql://user:password@localhost:5432/workhubb
+   # Banco de dados (obrigatório em dev e produção)
+   POSTGRES_URL=postgresql://user:password@host:5432/workhubb
+   POSTGRES_URL_NON_POOLING=postgresql://user:password@host:5432/workhubb
+   POSTGRES_PRISMA_URL=postgresql://user:password@host:5432/workhubb
    ```
    
    > **Nota**: 
    - O sistema funciona sem o token do Blob, mas usará base64 para fotos (não recomendado para produção).
-   - Para desenvolvimento local, o SQLite é usado automaticamente (não precisa configurar nada).
+   - O banco de dados agora é unificado em Postgres. Em desenvolvimento, utilize a mesma instância (ou um Postgres local) apontando as variáveis acima.
    - Para produção na Vercel, configure o Vercel Postgres (veja [VERCEL_POSTGRES_SETUP.md](./VERCEL_POSTGRES_SETUP.md))
    
    Para mais detalhes:
@@ -141,7 +143,7 @@ npm run lint         # Executa o linter ESLint
 
 ## 🚀 Deploy na Vercel
 
-O WorkHubb está configurado para deploy automático na Vercel com suporte híbrido para SQLite (desenvolvimento) e Vercel Postgres (produção).
+O WorkHubb está configurado para deploy automático na Vercel utilizando exclusivamente o Vercel Postgres.
 
 ### Deploy Rápido
 
