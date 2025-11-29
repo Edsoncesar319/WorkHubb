@@ -117,6 +117,17 @@ export async function POST(request: NextRequest) {
     if (errorCode === '23505' || errorMsg?.includes('duplicate key value')) {
       errorMessage = 'Este email já está cadastrado';
       statusCode = 409;
+    } else if (errorCode === '42P01' || 
+               errorMsg?.includes('does not exist') || 
+               errorMsg?.includes('relation') ||
+               errorMsg?.includes('Tabelas do banco') ||
+               errorMsg?.includes('Failed query')) {
+      errorMessage = process.env.VERCEL === '1'
+        ? 'Tabelas do banco de dados não foram criadas em produção. Execute o SQL em scripts/create-postgres-tables.sql no console SQL do Postgres da Vercel.'
+        : 'Tabelas do banco de dados não foram criadas. Execute: npm run db:sync:postgres';
+      statusCode = 503;
+      errorResponse.code = 'TABLES_NOT_EXIST';
+      errorResponse.help = 'Execute scripts/create-postgres-tables.sql in Vercel Postgres SQL Editor';
     } else if (errorMsg?.includes('Failed to identify your database') || 
                errorMsg?.includes('A server error occurred') ||
                errorMsg?.includes('connection') ||
@@ -139,7 +150,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Garantir que sempre retornamos um objeto válido
-    const errorResponse: { error: string; details?: any } = { 
+    const errorResponse: { error: string; code?: string; help?: string; details?: any } = { 
       error: errorMessage || 'Erro desconhecido ao criar usuário'
     };
     

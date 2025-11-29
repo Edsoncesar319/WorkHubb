@@ -37,13 +37,32 @@ export async function getUserByEmail(email: string): Promise<User | undefined> {
     const result = await database.select().from(users).where(eq(users.email, email)).limit(1);
     return result[0];
   } catch (error: any) {
+    const realError = error?.cause || error;
+    const errorMessage = realError?.message || error?.message || '';
+    const errorCode = realError?.code || error?.code;
+    
     console.error('Error in getUserByEmail:', error);
     console.error('Error details:', {
-      message: error?.message,
-      code: error?.code,
-      email: email
+      message: errorMessage,
+      code: errorCode,
+      email: email,
+      isVercel: process.env.VERCEL === '1',
+      vercelEnv: process.env.VERCEL_ENV
     });
-    throw new Error(error?.message || 'Erro ao buscar usuário por email');
+    
+    // Erro específico: tabela não existe
+    if (errorCode === '42P01' || 
+        errorMessage.includes('does not exist') || 
+        errorMessage.includes('relation') ||
+        errorMessage.includes('Failed query')) {
+      const helpfulMessage = 
+        process.env.VERCEL === '1' 
+          ? 'Tabelas do banco de dados não foram criadas em produção. Execute o SQL em scripts/create-postgres-tables.sql no console SQL do Postgres da Vercel.'
+          : 'Tabelas do banco de dados não foram criadas. Execute: npm run db:sync:postgres';
+      throw new Error(helpfulMessage);
+    }
+    
+    throw new Error(errorMessage || 'Erro ao buscar usuário por email');
   }
 }
 
@@ -113,6 +132,18 @@ export async function createUser(user: NewUser): Promise<User> {
     // Re-throw com mensagem mais clara
     if (errorCode === '23505' || errorMessage?.includes('duplicate key value')) {
       throw new Error('Este email já está cadastrado');
+    }
+    
+    // Erro específico: tabela não existe
+    if (errorCode === '42P01' || 
+        errorMessage?.includes('does not exist') || 
+        errorMessage?.includes('relation') ||
+        errorMessage?.includes('Failed query')) {
+      const helpfulMessage = 
+        process.env.VERCEL === '1' 
+          ? 'Tabelas do banco de dados não foram criadas em produção. Execute o SQL em scripts/create-postgres-tables.sql no console SQL do Postgres da Vercel.'
+          : 'Tabelas do banco de dados não foram criadas. Execute: npm run db:sync:postgres';
+      throw new Error(helpfulMessage);
     }
     
     // Erros de conexão/banco
