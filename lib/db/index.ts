@@ -1,7 +1,9 @@
+import './env';
+import { createPool } from '@vercel/postgres';
 import { drizzle as drizzleWithVercel, type VercelPgDatabase } from 'drizzle-orm/vercel-postgres';
 import { drizzle as drizzleWithPostgresJs, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { sql as vercelSql } from '@vercel/postgres';
 import postgres from 'postgres';
+import { getPostgresDirectUrl, getPostgresPoolUrl } from './env';
 import * as schema from './schema';
 
 type Database = VercelPgDatabase<typeof schema> | PostgresJsDatabase<typeof schema>;
@@ -11,103 +13,93 @@ const globalForDb = globalThis as typeof globalThis & {
   __workhubbPgClient?: ReturnType<typeof postgres>;
 };
 
-// Priorizar URLs não-pooling para desenvolvimento local
-// URLs do Prisma Accelerate (db.prisma.io) não funcionam com postgres-js diretamente
-// Verificar variáveis padrão e com prefixo WORKHUB_
-const connectionString =
-  // Priorizar URLs que NÃO sejam do Prisma Accelerate
-  [process.env.POSTGRES_URL_NON_POOLING, 
-   process.env.WORKHUB_POSTGRES_URL_NON_POOLING,
-   process.env.POSTGRES_URL,
-   process.env.WORKHUB_POSTGRES_URL,
-   process.env.DATABASE_URL,
-   process.env.WORKHUB_DATABASE_URL]
-    .find(url => url && !url.includes('prisma.io') && !url.includes('prisma-data.net') && !url.startsWith('prisma+')) ||
-  // Se não encontrou URL direta, usar qualquer uma (mas vai dar erro depois)
-  process.env.POSTGRES_URL_NON_POOLING ||
-  process.env.WORKHUB_POSTGRES_URL_NON_POOLING ||
-  process.env.POSTGRES_URL ||
-  process.env.WORKHUB_POSTGRES_URL ||
-  process.env.DATABASE_URL ||
-  process.env.WORKHUB_DATABASE_URL;
-
 const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL_ENV;
 
-// Detectar se estamos usando URLs do Prisma Accelerate
-const isPrismaAccelerateUrl = connectionString ? (
-  connectionString.includes('prisma.io') || 
-  connectionString.includes('prisma-data.net') ||
-  connectionString.startsWith('prisma+')
-) : false;
+function resolvePoolUrl(): string | undefined {
+  return getPostgresPoolUrl();
+}
+
+function isPrismaAccelerateUrl(url: string): boolean {
+  return (
+    url.includes('db.prisma.io') ||
+    url.includes('prisma-data.net') ||
+    url.startsWith('prisma+')
+  );
+}
 
 function createDb(): Database {
   if (globalForDb.__workhubbDb) {
     return globalForDb.__workhubbDb;
   }
 
-  // Usar @vercel/postgres em produção OU quando detectar URLs do Prisma Accelerate
-  // porque @vercel/postgres funciona com essas URLs, mas postgres-js não
-  if (isVercel || isPrismaAccelerateUrl) {
-    if (isPrismaAccelerateUrl && !isVercel) {
-      console.log('Using @vercel/postgres (compatible with Prisma Accelerate URLs)');
-    } else {
-      console.log('Using Vercel Postgres (serverless mode)');
-    }
-    const database = drizzleWithVercel(vercelSql, { schema });
-    globalForDb.__workhubbDb = database;
-    return database;
-  }
+  const poolUrl = resolvePoolUrl();
+  const directUrl = getPostgresDirectUrl() ?? poolUrl;
 
-  if (!connectionString) {
+  if (!poolUrl && !directUrl) {
     throw new Error(
-      'Postgres não configurado. Defina POSTGRES_URL (ou DATABASE_URL/POSTGRES_URL_NON_POOLING) no ambiente local.'
+      'Postgres não configurado na Vercel. Conecte Storage > Postgres ao projeto ' +
+        '(variáveis POSTGRES_URL ou DATABASE_URL) e faça um novo deploy.'
     );
   }
 
-  // Log da configuração (sem expor a senha)
-  const maskedUrl = connectionString.replace(/:[^:@]+@/, ':****@');
-  
-  console.log('Connecting to Postgres (direct connection):', {
-    url: maskedUrl,
-    hasPostgresUrl: !!(process.env.POSTGRES_URL || process.env.WORKHUB_POSTGRES_URL),
-    hasPostgresUrlNonPooling: !!(process.env.POSTGRES_URL_NON_POOLING || process.env.WORKHUB_POSTGRES_URL_NON_POOLING),
-    hasDatabaseUrl: !!(process.env.DATABASE_URL || process.env.WORKHUB_DATABASE_URL),
-  });
+  const connectionString = poolUrl ?? directUrl!;
+
+  // Produção Vercel ou URL pooled: @vercel/postgres com connectionString explícita
+  if (isVercel || !isPrismaAccelerateUrl(connectionString)) {
+    try {
+      const pool = createPool({ connectionString });
+      const database = drizzleWithVercel(pool, { schema });
+      globalForDb.__workhubbDb = database;
+      return database;
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      // Se falhar na Vercel, não tentar postgres-js com URL pooled
+      if (isVercel) {
+        throw new Error(
+          `Erro ao conectar ao Postgres: ${err?.message ?? 'desconhecido'}. ` +
+            `Confira Storage > Postgres no dashboard da Vercel.`
+        );
+      }
+    }
+  }
+
+  // Desenvolvimento local: conexão direta via postgres-js
+  const localUrl = directUrl ?? connectionString;
+  if (!localUrl) {
+    throw new Error(
+      'Postgres não configurado. Defina POSTGRES_URL ou DATABASE_URL no .env.local'
+    );
+  }
 
   const disableSSL = process.env.POSTGRES_DISABLE_SSL === '1';
-  const maxConnections = Number.parseInt(process.env.POSTGRES_MAX_CONNECTIONS || '5', 10);
+  const maxConnections = Number.parseInt(
+    process.env.POSTGRES_MAX_CONNECTIONS || '5',
+    10
+  );
 
-  try {
-    const client = postgres(connectionString, {
-      ssl: disableSSL ? false : 'require',
-      max: Number.isNaN(maxConnections) ? 5 : maxConnections,
-      onnotice: () => {}, // Silenciar avisos do Postgres
-    });
+  const client = postgres(localUrl, {
+    ssl: disableSSL ? false : 'require',
+    max: Number.isNaN(maxConnections) ? 5 : maxConnections,
+    onnotice: () => {},
+  });
 
-    globalForDb.__workhubbPgClient = client;
-    const database = drizzleWithPostgresJs(client, { schema });
-    globalForDb.__workhubbDb = database;
-    console.log('Postgres connection established successfully (direct)');
-    return database;
-  } catch (error: any) {
-    console.error('Failed to create Postgres connection:', {
-      message: error?.message,
-      code: error?.code,
-      name: error?.name,
-      cause: error?.cause?.message,
-    });
-    
-    const errorMsg = error?.cause?.message || error?.message || 'Erro desconhecido';
-    throw new Error(
-      `Erro ao conectar ao Postgres: ${errorMsg}. Verifique se a URL de conexão está correta.`
-    );
-  }
+  globalForDb.__workhubbPgClient = client;
+  const database = drizzleWithPostgresJs(client, { schema });
+  globalForDb.__workhubbDb = database;
+  return database;
 }
 
-const dbInstance = createDb();
+let dbInstance: Database | null = null;
+
+function getDbInstance(): Database {
+  if (!dbInstance) {
+    dbInstance = createDb();
+  }
+  return dbInstance;
+}
 
 export async function ensureDbInitialized(): Promise<Database> {
-  return dbInstance;
+  return getDbInstance();
 }
 
 export async function closeDb() {
@@ -115,9 +107,19 @@ export async function closeDb() {
     await globalForDb.__workhubbPgClient.end({ timeout: 5 });
     globalForDb.__workhubbPgClient = undefined;
     globalForDb.__workhubbDb = undefined;
+    dbInstance = null;
   }
 }
 
-export const db = dbInstance;
+/** Cliente Drizzle — inicialização lazy */
+export const db = new Proxy({} as Database, {
+  get(_target, prop) {
+    const instance = getDbInstance();
+    const value = Reflect.get(instance, prop, instance);
+    return typeof value === 'function'
+      ? (value as (...args: unknown[]) => unknown).bind(instance)
+      : value;
+  },
+});
 
 export * from './schema';

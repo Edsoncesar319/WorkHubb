@@ -27,6 +27,7 @@ O WorkHubb é uma aplicação web desenvolvida em Next.js que facilita a conexã
 - **Forms**: React Hook Form, Zod
 - **State Management**: React Hooks
 - **Database**: Vercel Postgres (produção e desenvolvimento)
+- **ORM**: Prisma + Drizzle ORM
 - **File Storage**: Vercel Blob (fotos de perfil)
 
 ## 📦 Instalação e Execução
@@ -67,11 +68,11 @@ O WorkHubb é uma aplicação web desenvolvida em Next.js que facilita a conexã
    > **Nota**: 
    - O sistema funciona sem o token do Blob, mas usará base64 para fotos (não recomendado para produção).
    - O banco de dados agora é unificado em Postgres. Em desenvolvimento, utilize a mesma instância (ou um Postgres local) apontando as variáveis acima.
-   - Para produção na Vercel, configure o Vercel Postgres (veja [VERCEL_POSTGRES_SETUP.md](./VERCEL_POSTGRES_SETUP.md))
+   - Para produção na Vercel, siga [VERCEL_SETUP.md](./VERCEL_SETUP.md)
    
    Para mais detalhes:
-   - [VERCEL_BLOB_SETUP.md](./VERCEL_BLOB_SETUP.md) - Configuração do Vercel Blob
-   - [VERCEL_POSTGRES_SETUP.md](./VERCEL_POSTGRES_SETUP.md) - Configuração do Vercel Postgres
+   - [VERCEL_SETUP.md](./VERCEL_SETUP.md) - Deploy completo na Vercel (Postgres + Blob)
+   - [PRISMA_SETUP.md](./PRISMA_SETUP.md) - Prisma ORM e migrations
 
 4. **Execute a aplicação em modo de desenvolvimento**
    ```bash
@@ -164,7 +165,7 @@ O WorkHubb está configurado para deploy automático na Vercel utilizando exclus
 ### Guia Completo
 
 Para instruções detalhadas, consulte:
-- **[DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md)** - Guia completo passo a passo
+- **[PRISMA_SETUP.md](./PRISMA_SETUP.md)** - Configuração do Prisma ORM
 - **[VERCEL_POSTGRES_SETUP.md](./VERCEL_POSTGRES_SETUP.md)** - Configuração do Postgres
 - **[VERCEL_BLOB_SETUP.md](./VERCEL_BLOB_SETUP.md)** - Configuração do Blob (opcional)
 

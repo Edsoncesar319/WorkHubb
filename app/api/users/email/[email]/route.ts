@@ -45,11 +45,21 @@ export async function GET(
     // Se o erro for relacionado ao banco não estar disponível,
     // retornar 404 em vez de 500 para permitir que o registro continue
     // (assumindo que o email não existe se o banco não está disponível)
-    if (errorMessage.includes('not available') || 
-        errorMessage.includes('not configured') ||
-        errorMessage.includes('Vercel Postgres não configurado')) {
-      console.warn('Database not available, returning 404 to allow registration');
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (
+      errorMessage.includes('missing_connection_string') ||
+      errorMessage.includes('not available') ||
+      errorMessage.includes('not configured') ||
+      errorMessage.includes('Postgres não configurado') ||
+      errorMessage.includes('Vercel Postgres não configurado')
+    ) {
+      return NextResponse.json(
+        {
+          error: 'Banco de dados não configurado na Vercel',
+          code: 'DB_NOT_CONFIGURED',
+          help: 'Conecte Storage > Postgres ao projeto e redeploy. Veja VERCEL_SETUP.md',
+        },
+        { status: 503 }
+      );
     }
     
     // Para outros erros, retornar 500

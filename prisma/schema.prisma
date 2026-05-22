@@ -1,0 +1,90 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // Pooled (Vercel: POSTGRES_PRISMA_URL ou POSTGRES_URL — lib/db/env.ts define DATABASE_URL)
+  url       = env("DATABASE_URL")
+  // Direct connection para migrations (Vercel Postgres: POSTGRES_URL_NON_POOLING)
+  directUrl = env("POSTGRES_URL_NON_POOLING")
+}
+
+// Tabela de usuários
+model User {
+  id          String   @id
+  name        String
+  email       String   @unique
+  type        String   // Usa String para compatibilidade com banco existente (TEXT)
+  bio         String?
+  stack       String?
+  github      String?
+  linkedin    String?
+  company     String?
+  profilePhoto String? @map("profile_photo")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relações
+  jobs         Job[]
+  applications Application[]
+  experiences  Experience[]
+
+  @@map("users")
+}
+
+// Tabela de vagas
+model Job {
+  id           String   @id
+  title        String
+  company      String
+  location     String
+  remote       Boolean
+  salary       String?
+  description  String
+  requirements String   // Armazenado como JSON string
+  authorId     String   @map("author_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relações
+  author       User         @relation(fields: [authorId], references: [id])
+  applications Application[]
+
+  @@map("jobs")
+}
+
+// Tabela de candidaturas
+model Application {
+  id        String   @id
+  userId    String   @map("user_id")
+  jobId     String   @map("job_id")
+  message   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relações
+  user User @relation(fields: [userId], references: [id])
+  job  Job  @relation(fields: [jobId], references: [id])
+
+  @@map("applications")
+}
+
+// Tabela de experiências profissionais
+model Experience {
+  id          String   @id
+  userId      String   @map("user_id")
+  title       String
+  company     String
+  location    String?
+  startDate   String   @map("start_date")
+  endDate     String?  @map("end_date")
+  current     Boolean  @default(false)
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relações
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("experiences")
+}
