@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserByEmail } from '@/lib/db/queries';
+import { formatPrismaError } from '@/lib/db/prisma-errors';
 
 export async function GET(
   request: NextRequest,
@@ -30,6 +31,14 @@ export async function GET(
       vercelEnv: process.env.VERCEL_ENV
     });
     
+    const prismaFormatted = formatPrismaError(error);
+    if (prismaFormatted.code === 'PRISMA_API_KEY_INVALID' || prismaFormatted.code === 'DB_UNREACHABLE') {
+      return NextResponse.json(
+        { error: prismaFormatted.message, code: prismaFormatted.code },
+        { status: prismaFormatted.status }
+      );
+    }
+
     // Erro específico: tabelas não existem
     if (errorCode === '42P01' || 
         errorMessage.includes('does not exist') || 

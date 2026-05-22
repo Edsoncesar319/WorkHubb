@@ -8,15 +8,18 @@ Guia para publicar o projeto com **Vercel Postgres**, **Vercel Blob** e **Prisma
 2. Framework: **Next.js** (detectado automaticamente).
 3. Não altere o Build Command — o `vercel.json` já usa `npm run vercel-build`.
 
-## 2. Vercel Postgres (obrigatório)
+## 2. Banco de dados (obrigatório)
 
-1. No projeto: **Storage** → **Create Database** → **Postgres**.
-2. Conecte o banco ao projeto (variáveis injetadas automaticamente):
-   - `POSTGRES_URL`
-   - `POSTGRES_URL_NON_POOLING`
-   - `POSTGRES_PRISMA_URL`
+Este projeto usa **Prisma Postgres** (`db.prisma.io`) com variáveis no formato:
 
-O código em `lib/db/env.ts` define `DATABASE_URL` e `POSTGRES_URL_NON_POOLING` quando faltam, para Drizzle e Prisma funcionarem sem configuração manual.
+- `WORKHUB_PRISMA_DATABASE_URL` — `prisma+postgres://...` (**obrigatória** para a app)
+- `WORKHUB_POSTGRES_URL` — `postgres://...@db.prisma.io` (migrations / directUrl)
+- `DATABASE_URL` — deve ser igual a `WORKHUB_PRISMA_DATABASE_URL`
+
+1. Vercel → **Storage** → **Prisma Postgres** (ou Postgres conectado ao Prisma) → **Connect to Project**
+2. Local: `vercel env pull .env.development.local`
+3. `npm run prisma:setup-env` — copia as URLs corretas para `DATABASE_URL`
+4. **Redeploy** na Vercel após conectar o Storage
 
 ### Criar tabelas (primeira vez)
 
@@ -85,6 +88,16 @@ npm run build
 ```
 
 ## Problemas comuns
+
+### Erro: `API key is invalid` (P6002) ou conexão com Prisma Postgres
+
+A URL `WORKHUB_PRISMA_DATABASE_URL` expirou ou está incorreta.
+
+1. Vercel Dashboard → **Storage** → seu Prisma Postgres → aba **.env.local** ou **Connect**
+2. Copie de novo `WORKHUB_PRISMA_DATABASE_URL`
+3. Em **Settings → Environment Variables**, atualize `DATABASE_URL` com esse valor
+4. Local: `vercel env pull` + `npm run prisma:setup-env`
+5. **Redeploy**
 
 ### Erro: `missing_connection_string` / `POSTGRES_URL env var was found`
 

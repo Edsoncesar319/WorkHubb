@@ -46,11 +46,18 @@ export default function RegisterPage() {
         setError("Este email já está cadastrado")
         return
         }
-      } catch (emailCheckError: any) {
-        // Se houver erro ao verificar email, logar mas continuar
-        // (pode ser problema de rede, mas não devemos bloquear o registro)
+      } catch (emailCheckError: unknown) {
+        const msg =
+          emailCheckError instanceof Error ? emailCheckError.message : String(emailCheckError)
+        if (
+          msg.includes('P6002') ||
+          msg.includes('API key') ||
+          msg.includes('Credenciais do Prisma Postgres')
+        ) {
+          setError(msg)
+          return
+        }
         console.warn('Error checking if email exists:', emailCheckError)
-        // Continuar com o registro - se o email realmente existir, o erro virá na criação
       }
 
       const newUser: User = {

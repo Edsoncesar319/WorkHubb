@@ -165,11 +165,30 @@ export async function findUserByEmail(email: string): Promise<User | undefined> 
         throw new Error('Vercel Postgres não configurado')
       }
       
+      if (
+        errorMessage.includes('P6002') ||
+        errorMessage.includes('API key is invalid') ||
+        errorMessage.includes('PRISMA_API_KEY_INVALID') ||
+        errorMessage.includes('Credenciais do Prisma Postgres')
+      ) {
+        throw new Error(
+          'Credenciais do Prisma Postgres inválidas. Atualize WORKHUB_PRISMA_DATABASE_URL na Vercel (Storage → Prisma Postgres), depois: vercel env pull .env.development.local && npm run prisma:setup-env'
+        )
+      }
+
       throw new Error(errorMessage)
     }
     
     return await response.json()
   } catch (error: any) {
+    if (
+      error?.message?.includes('P6002') ||
+      error?.message?.includes('API key is invalid') ||
+      error?.message?.includes('Credenciais do Prisma Postgres')
+    ) {
+      throw error
+    }
+
     // Se for um erro relacionado ao banco não configurado, lançar para que o login mostre mensagem apropriada
     if (error?.message?.includes('Vercel Postgres não configurado') ||
         error?.message?.includes('not configured') ||

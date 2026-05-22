@@ -1,85 +1,55 @@
 import './env';
-import { createPool } from '@vercel/postgres';
-import { drizzle as drizzleWithVercel, type VercelPgDatabase } from 'drizzle-orm/vercel-postgres';
 import { drizzle as drizzleWithPostgresJs, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { getPostgresDirectUrl, getPostgresPoolUrl } from './env';
+import {
+  getPostgresDirectUrl,
+  getPostgresPoolUrl,
+  isDirectPostgresUrl,
+} from './env';
 import * as schema from './schema';
 
-type Database = VercelPgDatabase<typeof schema> | PostgresJsDatabase<typeof schema>;
+type Database = PostgresJsDatabase<typeof schema>;
 
 const globalForDb = globalThis as typeof globalThis & {
   __workhubbDb?: Database;
   __workhubbPgClient?: ReturnType<typeof postgres>;
 };
 
-const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL_ENV;
-
-function resolvePoolUrl(): string | undefined {
-  return getPostgresPoolUrl();
-}
-
-function isPrismaAccelerateUrl(url: string): boolean {
-  return (
-    url.includes('db.prisma.io') ||
-    url.includes('prisma-data.net') ||
-    url.startsWith('prisma+')
-  );
-}
-
 function createDb(): Database {
   if (globalForDb.__workhubbDb) {
     return globalForDb.__workhubbDb;
   }
 
-  const poolUrl = resolvePoolUrl();
-  const directUrl = getPostgresDirectUrl() ?? poolUrl;
+  const poolUrl = getPostgresPoolUrl();
+  const directUrl = getPostgresDirectUrl();
+  const connectionString = poolUrl ?? directUrl;
 
-  if (!poolUrl && !directUrl) {
+  if (!connectionString || !isDirectPostgresUrl(connectionString)) {
+    const hasPrismaOnly =
+      !!process.env.DATABASE_URL?.startsWith('prisma+') ||
+      !!process.env.WORKHUB_PRISMA_DATABASE_URL?.startsWith('prisma+');
+
     throw new Error(
-      'Postgres não configurado na Vercel. Conecte Storage > Postgres ao projeto ' +
-        '(variáveis POSTGRES_URL ou DATABASE_URL) e faça um novo deploy.'
-    );
-  }
-
-  const connectionString = poolUrl ?? directUrl!;
-
-  // Produção Vercel ou URL pooled: @vercel/postgres com connectionString explícita
-  if (isVercel || !isPrismaAccelerateUrl(connectionString)) {
-    try {
-      const pool = createPool({ connectionString });
-      const database = drizzleWithVercel(pool, { schema });
-      globalForDb.__workhubbDb = database;
-      return database;
-    } catch (error: unknown) {
-      const err = error as { message?: string };
-      // Se falhar na Vercel, não tentar postgres-js com URL pooled
-      if (isVercel) {
-        throw new Error(
-          `Erro ao conectar ao Postgres: ${err?.message ?? 'desconhecido'}. ` +
-            `Confira Storage > Postgres no dashboard da Vercel.`
-        );
-      }
-    }
-  }
-
-  // Desenvolvimento local: conexão direta via postgres-js
-  const localUrl = directUrl ?? connectionString;
-  if (!localUrl) {
-    throw new Error(
-      'Postgres não configurado. Defina POSTGRES_URL ou DATABASE_URL no .env.local'
+      hasPrismaOnly
+        ? 'Apenas URL do Prisma Accelerate encontrada (prisma+...). ' +
+            'Defina WORKHUB_POSTGRES_URL ou POSTGRES_URL (URL postgres:// direta) na Vercel.'
+        : 'Postgres não configurado. Conecte Storage > Postgres ao projeto na Vercel ' +
+            'ou defina WORKHUB_POSTGRES_URL / POSTGRES_URL no .env.local e redeploy.'
     );
   }
 
   const disableSSL = process.env.POSTGRES_DISABLE_SSL === '1';
+  const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL_ENV;
   const maxConnections = Number.parseInt(
-    process.env.POSTGRES_MAX_CONNECTIONS || '5',
+    process.env.POSTGRES_MAX_CONNECTIONS || (isVercel ? '1' : '5'),
     10
   );
 
-  const client = postgres(localUrl, {
+  const client = postgres(connectionString, {
     ssl: disableSSL ? false : 'require',
-    max: Number.isNaN(maxConnections) ? 5 : maxConnections,
+    max: Number.isNaN(maxConnections) ? 1 : maxConnections,
+    idle_timeout: isVercel ? 20 : 0,
+    connect_timeout: 15,
     onnotice: () => {},
   });
 
@@ -111,7 +81,6 @@ export async function closeDb() {
   }
 }
 
-/** Cliente Drizzle — inicialização lazy */
 export const db = new Proxy({} as Database, {
   get(_target, prop) {
     const instance = getDbInstance();

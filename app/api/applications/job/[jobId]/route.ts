@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq, desc } from 'drizzle-orm';
-import { applications, users } from '@/lib/db/schema';
-import { db } from '@/lib/db';
+import { getJobApplicationsWithUsers } from '@/lib/db/queries';
 
 export async function GET(
   request: NextRequest,
@@ -9,18 +7,7 @@ export async function GET(
 ) {
   try {
     const { jobId } = await params;
-    
-    // Buscar candidaturas com informações do candidato
-    const result = await db
-      .select({
-        application: applications,
-        user: users,
-      })
-      .from(applications)
-      .leftJoin(users, eq(applications.userId, users.id))
-      .where(eq(applications.jobId, jobId))
-      .orderBy(desc(applications.createdAt));
-    
+    const result = await getJobApplicationsWithUsers(jobId);
     return NextResponse.json(result);
   } catch (error) {
     console.error('Error fetching applications by job:', error);

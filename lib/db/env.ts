@@ -1,131 +1,141 @@
 /**
- * Normaliza variáveis do Vercel Postgres / Neon para Drizzle, @vercel/postgres e Prisma.
- * Importe este módulo antes de qualquer cliente de banco (ex.: lib/db/index.ts).
+ * Normaliza variáveis do Vercel Postgres / Prisma Postgres / Neon.
  */
+
+function stripQuotes(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  return value.trim().replace(/^["']+|["']+$/g, '');
+}
+
+function env(name: string): string | undefined {
+  return stripQuotes(process.env[name]);
+}
 
 function firstDefined(...values: (string | undefined)[]): string | undefined {
   return values.find((v) => v && v.length > 0);
 }
 
-/** Monta URL a partir de POSTGRES_HOST, POSTGRES_USER, etc. (formato Vercel Storage) */
-function buildUrlFromPostgresParts(): string | undefined {
-  const host = firstDefined(
-    process.env.POSTGRES_HOST,
-    process.env.WORKHUB_POSTGRES_HOST
+export function isPrismaHostedUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  return (
+    url.startsWith('prisma+') ||
+    url.includes('db.prisma.io') ||
+    url.includes('prisma-data.net')
   );
-  const user = firstDefined(
-    process.env.POSTGRES_USER,
-    process.env.WORKHUB_POSTGRES_USER
-  );
-  const password = firstDefined(
-    process.env.POSTGRES_PASSWORD,
-    process.env.WORKHUB_POSTGRES_PASSWORD
-  );
-  const database = firstDefined(
-    process.env.POSTGRES_DATABASE,
-    process.env.WORKHUB_POSTGRES_DATABASE
-  );
-
-  if (!host || !user || !password || !database) return undefined;
-
-  const port = firstDefined(process.env.POSTGRES_PORT, '5432');
-  return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}?sslmode=require`;
 }
 
-/** Procura qualquer env *POSTGRES*URL* ou DATABASE_URL com protocolo postgres */
-function findPostgresUrlInProcessEnv(): string | undefined {
-  for (const [key, value] of Object.entries(process.env)) {
-    if (!value || !value.startsWith('postgres')) continue;
-    const upper = key.toUpperCase();
-    if (
-      upper === 'DATABASE_URL' ||
-      upper.endsWith('_DATABASE_URL') ||
-      (upper.includes('POSTGRES') && upper.includes('URL') && !upper.includes('NON_POOLING'))
-    ) {
-      return value;
-    }
+/** URLs postgres:// diretas (Neon, Vercel Postgres) — não Prisma Postgres */
+export function isDirectPostgresUrl(url: string | undefined): boolean {
+  if (!url || isPrismaHostedUrl(url)) return false;
+  return url.startsWith('postgresql://') || url.startsWith('postgres://');
+}
+
+function pickDirectUrl(...candidates: (string | undefined)[]): string | undefined {
+  return candidates.find(isDirectPostgresUrl);
+}
+
+function pickPrismaUrl(...candidates: (string | undefined)[]): string | undefined {
+  return candidates.find(isPrismaHostedUrl);
+}
+
+export function shouldUsePrismaClient(): boolean {
+  ensureDatabaseEnv();
+  return !!pickPrismaUrl(
+    env('WORKHUB_PRISMA_DATABASE_URL'),
+    env('DATABASE_URL'),
+    env('WORKHUB_DATABASE_URL'),
+    env('WORKHUB_POSTGRES_URL'),
+    env('POSTGRES_URL')
+  );
+}
+
+export function ensureDatabaseEnv(): void {
+  const prismaUrl = pickPrismaUrl(
+    env('WORKHUB_PRISMA_DATABASE_URL'),
+    env('DATABASE_URL'),
+    env('WORKHUB_DATABASE_URL')
+  );
+
+  const directPrisma = pickPrismaUrl(
+    env('WORKHUB_POSTGRES_URL'),
+    env('POSTGRES_URL'),
+    env('WORKHUB_DATABASE_URL'),
+    env('DATABASE_URL')
+  );
+
+  const neonUrl = pickDirectUrl(
+    env('WORKHUB_POSTGRES_URL'),
+    env('POSTGRES_URL'),
+    env('POSTGRES_URL_NON_POOLING'),
+    env('WORKHUB_POSTGRES_URL_NON_POOLING')
+  );
+
+  // Prisma Client: prisma+postgres://... ou postgres://db.prisma.io
+  if (!process.env.DATABASE_URL) {
+    process.env.DATABASE_URL = firstDefined(prismaUrl, directPrisma, neonUrl);
+  } else if (prismaUrl && isPrismaHostedUrl(env('DATABASE_URL'))) {
+    process.env.DATABASE_URL = prismaUrl;
   }
-  return undefined;
+
+  if (!process.env.POSTGRES_URL) {
+    process.env.POSTGRES_URL = firstDefined(neonUrl, directPrisma, prismaUrl);
+  }
+
+  if (!process.env.POSTGRES_URL_NON_POOLING) {
+    process.env.POSTGRES_URL_NON_POOLING = firstDefined(
+      env('POSTGRES_URL_NON_POOLING'),
+      env('WORKHUB_POSTGRES_URL_NON_POOLING'),
+      directPrisma,
+      neonUrl,
+      env('POSTGRES_URL')
+    );
+  }
 }
 
 export function getPostgresPoolUrl(): string | undefined {
   ensureDatabaseEnv();
-  return firstDefined(
-    process.env.POSTGRES_PRISMA_URL,
-    process.env.POSTGRES_URL,
-    process.env.DATABASE_URL,
-    process.env.WORKHUB_POSTGRES_PRISMA_URL,
-    process.env.WORKHUB_POSTGRES_URL,
-    process.env.WORKHUB_DATABASE_URL
+  return pickDirectUrl(
+    env('WORKHUB_POSTGRES_URL'),
+    env('POSTGRES_URL'),
+    env('POSTGRES_URL_NON_POOLING'),
+    env('WORKHUB_DATABASE_URL'),
+    env('DATABASE_URL')
   );
 }
 
 export function getPostgresDirectUrl(): string | undefined {
   ensureDatabaseEnv();
-  return firstDefined(
-    process.env.POSTGRES_URL_NON_POOLING,
-    process.env.POSTGRES_URL,
-    process.env.DATABASE_URL,
-    process.env.WORKHUB_POSTGRES_URL_NON_POOLING,
-    process.env.WORKHUB_POSTGRES_URL,
-    process.env.WORKHUB_DATABASE_URL
+  return pickDirectUrl(
+    env('POSTGRES_URL_NON_POOLING'),
+    env('WORKHUB_POSTGRES_URL_NON_POOLING'),
+    env('WORKHUB_POSTGRES_URL'),
+    env('POSTGRES_URL')
   );
 }
 
-export function ensureDatabaseEnv(): void {
-  const fromScan = findPostgresUrlInProcessEnv();
-  const fromParts = buildUrlFromPostgresParts();
-
-  const postgresUrl = firstDefined(
-    process.env.POSTGRES_URL,
-    process.env.WORKHUB_POSTGRES_URL,
-    fromScan,
-    fromParts
+export function getDatabaseConfigStatus(): {
+  ok: boolean;
+  mode: 'prisma' | 'postgres' | 'none';
+  varsPresent: string[];
+  hint?: string;
+} {
+  ensureDatabaseEnv();
+  const varsPresent = Object.keys(process.env).filter(
+    (k) =>
+      /^(POSTGRES|DATABASE|WORKHUB)/i.test(k) &&
+      !!process.env[k]
   );
-
-  const postgresNonPooling = firstDefined(
-    process.env.POSTGRES_URL_NON_POOLING,
-    process.env.WORKHUB_POSTGRES_URL_NON_POOLING
-  );
-
-  const prismaUrl = firstDefined(
-    process.env.POSTGRES_PRISMA_URL,
-    process.env.WORKHUB_POSTGRES_PRISMA_URL
-  );
-
-  const databaseUrl = firstDefined(
-    process.env.DATABASE_URL,
-    process.env.WORKHUB_DATABASE_URL,
-    fromScan,
-    fromParts
-  );
-
-  // @vercel/postgres exige POSTGRES_URL em process.env
-  if (!process.env.POSTGRES_URL) {
-    process.env.POSTGRES_URL = firstDefined(
-      prismaUrl,
-      postgresUrl,
-      databaseUrl,
-      postgresNonPooling
-    );
-  }
-
-  if (!process.env.DATABASE_URL) {
-    process.env.DATABASE_URL = firstDefined(
-      prismaUrl,
-      process.env.POSTGRES_URL,
-      postgresUrl,
-      databaseUrl
-    );
-  }
-
-  if (!process.env.POSTGRES_URL_NON_POOLING) {
-    process.env.POSTGRES_URL_NON_POOLING = firstDefined(
-      postgresNonPooling,
-      process.env.POSTGRES_URL,
-      databaseUrl
-    );
-  }
+  const usePrisma = shouldUsePrismaClient();
+  const direct = getPostgresPoolUrl();
+  return {
+    ok: usePrisma || !!direct,
+    mode: usePrisma ? 'prisma' : direct ? 'postgres' : 'none',
+    varsPresent,
+    hint:
+      usePrisma || direct
+        ? undefined
+        : 'Execute: vercel env pull .env.development.local',
+  };
 }
 
 ensureDatabaseEnv();

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllUsers, createUser } from '@/lib/db/queries';
+import { formatPrismaError } from '@/lib/db/prisma-errors';
 
 export async function GET() {
   try {
@@ -110,10 +111,20 @@ export async function POST(request: NextRequest) {
     const errorMsg = realError?.message || error?.message || '';
     const errorCode = realError?.code || error?.code;
     
-    // Retornar mensagem de erro mais detalhada
+    const prismaFormatted = formatPrismaError(error);
+    if (prismaFormatted.code === 'PRISMA_API_KEY_INVALID' || prismaFormatted.code === 'DB_UNREACHABLE') {
+      return NextResponse.json(
+        { error: prismaFormatted.message, code: prismaFormatted.code },
+        { status: prismaFormatted.status }
+      );
+    }
+
     let errorMessage = 'Erro ao criar usuário';
     let statusCode = 500;
-    
+    const errorResponse: { error: string; code?: string; help?: string; details?: unknown } = {
+      error: errorMessage,
+    };
+
     if (errorCode === '23505' || errorMsg?.includes('duplicate key value')) {
       errorMessage = 'Este email já está cadastrado';
       statusCode = 409;
@@ -149,11 +160,8 @@ export async function POST(request: NextRequest) {
       errorMessage = error.toString();
     }
     
-    // Garantir que sempre retornamos um objeto válido
-    const errorResponse: { error: string; code?: string; help?: string; details?: any } = { 
-      error: errorMessage || 'Erro desconhecido ao criar usuário'
-    };
-    
+    errorResponse.error = errorMessage || 'Erro desconhecido ao criar usuário';
+
     if (process.env.NODE_ENV === 'development') {
       errorResponse.details = {
         message: error?.message,
