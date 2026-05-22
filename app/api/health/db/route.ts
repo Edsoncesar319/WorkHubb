@@ -10,9 +10,21 @@ export async function GET() {
     return NextResponse.json(
       {
         ok: false,
-        mode: status.mode,
-        vars: status.varsPresent,
+        host: status.host,
+        source: status.source,
         hint: status.hint,
+        vars: status.varsPresent,
+      },
+      { status: 503 }
+    );
+  }
+
+  if (status.host === 'db.prisma.io') {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: 'LEGACY_PRISMA_POSTGRES',
+        hint: 'Use Vercel Postgres (Neon) em vez de db.prisma.io',
       },
       { status: 503 }
     );
@@ -22,17 +34,17 @@ export async function GET() {
     await prisma.$queryRaw`SELECT 1 as ok`;
     return NextResponse.json({
       ok: true,
-      mode: status.mode,
-      vars: status.varsPresent,
+      host: status.host,
+      source: status.source,
     });
   } catch (error) {
     const formatted = formatPrismaError(error);
     return NextResponse.json(
       {
         ok: false,
-        mode: status.mode,
         error: formatted.message,
         code: formatted.code,
+        host: status.host,
       },
       { status: formatted.status }
     );

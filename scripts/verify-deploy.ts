@@ -1,116 +1,59 @@
 #!/usr/bin/env tsx
-/**
- * Verifica se o projeto está pronto para deploy na Vercel
- * Execute: npx tsx scripts/verify-deploy.ts
- */
-
 import { existsSync, readFileSync } from 'fs';
 
-const checks: Array<{ name: string; check: () => boolean; message: string }> =
-  [];
-
-checks.push({
-  name: 'package.json',
-  check: () => existsSync('package.json'),
-  message: '❌ package.json não encontrado',
-});
-
-checks.push({
-  name: 'next.config.mjs',
-  check: () => existsSync('next.config.mjs'),
-  message: '❌ next.config.mjs não encontrado',
-});
-
-checks.push({
-  name: 'vercel.json',
-  check: () => existsSync('vercel.json'),
-  message: '❌ vercel.json não encontrado',
-});
-
-checks.push({
-  name: 'prisma/schema.prisma',
-  check: () => existsSync('prisma/schema.prisma'),
-  message: '❌ prisma/schema.prisma não encontrado',
-});
-
-checks.push({
-  name: 'lib/db/env.ts',
-  check: () => existsSync('lib/db/env.ts'),
-  message: '❌ lib/db/env.ts não encontrado (aliases Vercel Postgres)',
-});
-
-checks.push({
-  name: 'Dependências críticas',
-  check: () => {
-    const pkg = JSON.parse(readFileSync('package.json', 'utf-8'));
-    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-    const required = [
-      'next',
-      'react',
-      'react-dom',
-      '@vercel/postgres',
-      '@prisma/client',
-      'prisma',
-      'drizzle-orm',
-    ];
-    return required.every((dep) => deps[dep]);
+const checks: Array<{ name: string; check: () => boolean; message: string }> = [
+  {
+    name: 'package.json',
+    check: () => existsSync('package.json'),
+    message: '❌ package.json',
   },
-  message: '❌ Algumas dependências críticas estão faltando',
-});
-
-checks.push({
-  name: 'Scripts de build Vercel',
-  check: () => {
-    const pkg = JSON.parse(readFileSync('package.json', 'utf-8'));
-    return (
-      pkg.scripts?.postinstall?.includes('prisma generate') &&
-      (pkg.scripts?.['vercel-build']?.includes('prisma generate') ||
-        pkg.scripts?.build?.includes('prisma generate'))
-    );
+  {
+    name: 'vercel.json + vercel-build',
+    check: () => {
+      const pkg = JSON.parse(readFileSync('package.json', 'utf-8'));
+      return (
+        existsSync('vercel.json') &&
+        pkg.scripts?.['vercel-build']?.includes('migrate deploy')
+      );
+    },
+    message: '❌ vercel-build deve incluir prisma migrate deploy',
   },
-  message:
-    '❌ postinstall/vercel-build devem incluir prisma generate',
-});
+  {
+    name: 'prisma/schema.prisma',
+    check: () => existsSync('prisma/schema.prisma'),
+    message: '❌ prisma/schema.prisma',
+  },
+  {
+    name: 'prisma/migrations',
+    check: () => existsSync('prisma/migrations/20250522000000_init/migration.sql'),
+    message: '❌ migration inicial',
+  },
+  {
+    name: 'lib/db/queries.ts (Prisma)',
+    check: () => {
+      const q = readFileSync('lib/db/queries.ts', 'utf-8');
+      return q.includes("from './prisma'") && !q.includes('drizzle-orm');
+    },
+    message: '❌ queries deve usar Prisma',
+  },
+  {
+    name: '@prisma/client',
+    check: () => {
+      const pkg = JSON.parse(readFileSync('package.json', 'utf-8'));
+      return !!pkg.dependencies?.['@prisma/client'];
+    },
+    message: '❌ @prisma/client',
+  },
+];
 
-checks.push({
-  name: 'lib/db/index.ts',
-  check: () => existsSync('lib/db/index.ts'),
-  message: '❌ lib/db/index.ts não encontrado',
-});
-
-checks.push({
-  name: 'scripts/create-postgres-tables.sql',
-  check: () => existsSync('scripts/create-postgres-tables.sql'),
-  message: '❌ scripts/create-postgres-tables.sql não encontrado',
-});
-
-console.log('🔍 Verificando configuração para deploy na Vercel...\n');
-
-let allPassed = true;
-
-for (const { name, check, message } of checks) {
-  const passed = check();
-  if (passed) {
-    console.log(`✅ ${name}`);
-  } else {
-    console.log(message);
-    allPassed = false;
+console.log('🔍 Verificação deploy Vercel\n');
+let ok = true;
+for (const c of checks) {
+  if (c.check()) console.log(`✅ ${c.name}`);
+  else {
+    console.log(c.message);
+    ok = false;
   }
 }
-
-console.log('\n' + '='.repeat(50));
-
-if (allPassed) {
-  console.log('\n✅ Todas as verificações passaram!');
-  console.log('\n📋 Próximos passos:');
-  console.log('1. Crie/conecte Vercel Postgres ao projeto');
-  console.log('2. Execute scripts/create-postgres-tables.sql (ou npm run prisma:push)');
-  console.log('3. (Opcional) Conecte Vercel Blob para uploads');
-  console.log('4. Deploy: vercel --prod ou push no Git');
-  console.log('\n📖 Consulte VERCEL_SETUP.md');
-} else {
-  console.log(
-    '\n❌ Algumas verificações falharam. Corrija antes do deploy.'
-  );
-  process.exit(1);
-}
+console.log(ok ? '\n✅ Pronto para deploy\n' : '\n❌ Corrija antes do deploy\n');
+process.exit(ok ? 0 : 1);

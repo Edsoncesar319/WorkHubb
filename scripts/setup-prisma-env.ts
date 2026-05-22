@@ -1,114 +1,80 @@
 #!/usr/bin/env tsx
 /**
- * Configura DATABASE_URL para Prisma (Prisma Postgres / Vercel)
- * Execute: npm run prisma:setup-env
+ * Sincroniza DATABASE_URL e DIRECT_DATABASE_URL para desenvolvimento local.
+ * Execute após: vercel env pull .env.development.local
  */
-
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { resolveDatabaseUrls } from '../lib/db/env';
 
-const envFiles = [
-  '.env.local',
-  '.env.development.local',
-  '.env',
-  '.env.development',
-];
-
-console.log('🔧 Configurando DATABASE_URL para Prisma...\n');
+const envFiles = ['.env.development.local', '.env.local', '.env'];
 
 let envFile: string | null = null;
 let envContent = '';
 
 for (const file of envFiles) {
-  const filePath = join(process.cwd(), file);
-  if (existsSync(filePath)) {
+  const path = join(process.cwd(), file);
+  if (existsSync(path)) {
     envFile = file;
-    envContent = readFileSync(filePath, 'utf-8');
-    console.log(`📄 Arquivo: ${file}\n`);
+    envContent = readFileSync(path, 'utf-8');
+    console.log(`📄 ${file}\n`);
     break;
   }
 }
 
 if (!envFile) {
-  console.log('⚠️  Nenhum .env encontrado. Criando .env.local...');
-  envFile = '.env.local';
-  envContent = '';
-}
-
-function readEnvValue(content: string, names: string[]): string | undefined {
-  for (const name of names) {
-    const match = content.match(new RegExp(`^${name}=(.+)$`, 'm'));
-    if (match) {
-      return match[1].trim().replace(/^["']|["']$/g, '');
-    }
-  }
-  return undefined;
-}
-
-// Prisma Postgres: preferir prisma+postgres:// (Accelerate/Data Proxy)
-const prismaDatabaseUrl = readEnvValue(envContent, [
-  'WORKHUB_PRISMA_DATABASE_URL',
-  'POSTGRES_PRISMA_URL',
-  'DATABASE_URL',
-]);
-
-const directUrl = readEnvValue(envContent, [
-  'WORKHUB_POSTGRES_URL',
-  'POSTGRES_URL',
-  'WORKHUB_DATABASE_URL',
-]);
-
-if (!prismaDatabaseUrl && !directUrl) {
-  console.log('❌ Nenhuma URL de banco encontrada.');
-  console.log('\n💡 Execute: vercel env pull .env.development.local\n');
+  console.log('❌ Nenhum .env encontrado. Execute: vercel env pull .env.development.local');
   process.exit(1);
 }
 
-const databaseUrl =
-  prismaDatabaseUrl?.startsWith('prisma+') ? prismaDatabaseUrl : prismaDatabaseUrl || directUrl;
-
-const postgresUrlNonPooling =
-  readEnvValue(envContent, [
-    'POSTGRES_URL_NON_POOLING',
-    'WORKHUB_POSTGRES_URL_NON_POOLING',
-  ]) || directUrl || databaseUrl;
-
-if (/^postgres/.test(databaseUrl || '') && !databaseUrl?.startsWith('prisma+')) {
-  console.log('⚠️  URL postgres:// para db.prisma.io detectada.');
-  console.log('   Use WORKHUB_PRISMA_DATABASE_URL (prisma+postgres://) no Prisma Dashboard.\n');
+// Carregar no process.env para resolveDatabaseUrls
+for (const line of envContent.split('\n')) {
+  const m = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+  if (m) {
+    const val = m[2].trim().replace(/^["']|["']$/g, '');
+    process.env[m[1]] = val;
+  }
 }
 
-if (hasDatabaseUrl(envContent)) {
-  envContent = envContent.replace(
-    /^DATABASE_URL=.*$/m,
-    `DATABASE_URL="${databaseUrl}"`
-  );
-  console.log('✅ DATABASE_URL atualizado');
-} else {
-  envContent += `\n# Prisma\nDATABASE_URL="${databaseUrl}"\n`;
-  console.log('✅ DATABASE_URL adicionado');
+const { databaseUrl, directDatabaseUrl, source, directSource } =
+  resolveDatabaseUrls();
+
+if (!databaseUrl) {
+  console.log('❌ Nenhuma URL Postgres encontrada.');
+  console.log('\nNa Vercel: Storage → Postgres (Neon) → Connect to Project');
+  console.log('Depois: vercel env pull .env.development.local\n');
+  process.exit(1);
 }
 
-if (!/^POSTGRES_URL=/m.test(envContent) && directUrl) {
-  envContent += `POSTGRES_URL="${directUrl}"\n`;
-  console.log('✅ POSTGRES_URL adicionado (directUrl / migrations)');
+function setOrAdd(name: string, value: string) {
+  const re = new RegExp(`^${name}=.*$`, 'm');
+  const line = `${name}="${value}"`;
+  if (re.test(envContent)) {
+    envContent = envContent.replace(re, line);
+  } else {
+    envContent += `\n${line}\n`;
+  }
 }
 
-if (!/^POSTGRES_URL_NON_POOLING=/m.test(envContent)) {
-  envContent += `POSTGRES_URL_NON_POOLING="${postgresUrlNonPooling}"\n`;
-  console.log('✅ POSTGRES_URL_NON_POOLING adicionado');
-}
+setOrAdd('DATABASE_URL', databaseUrl);
+if (directDatabaseUrl) setOrAdd('DIRECT_DATABASE_URL', directDatabaseUrl);
 
 writeFileSync(join(process.cwd(), envFile), envContent, 'utf-8');
 
-console.log(`\n✨ Salvo em ${envFile}`);
-console.log('\n📋 Próximos passos:');
-console.log('1. Se aparecer erro P6002 (API key inválida):');
-console.log('   Vercel → Storage → Prisma Postgres → .env.local → copie WORKHUB_PRISMA_DATABASE_URL');
-console.log('2. npm run prisma:generate');
-console.log('3. npm run prisma:push');
-console.log('4. npm run db:check\n');
+console.log(`✅ DATABASE_URL ← ${source}`);
+if (directDatabaseUrl)
+  console.log(`✅ DIRECT_DATABASE_URL ← ${directSource}`);
 
-function hasDatabaseUrl(content: string): boolean {
-  return /^DATABASE_URL=/m.test(content);
+try {
+  const host = new URL(databaseUrl.replace(/^prisma\+/, '')).hostname;
+  if (host === 'db.prisma.io' || databaseUrl.startsWith('prisma+')) {
+    console.log('\n⚠️  ATENÇÃO: URL legada Prisma Postgres detectada.');
+    console.log('   Para produção na Vercel, crie Storage → Postgres (Neon), não db.prisma.io.');
+    console.log('   Depois: vercel env pull && npm run prisma:setup-env\n');
+  }
+} catch {
+  /* ignore */
 }
+
+console.log(`\n💾 Salvo em ${envFile}`);
+console.log('\nPróximo: npm run db:validate && npm run dev\n');

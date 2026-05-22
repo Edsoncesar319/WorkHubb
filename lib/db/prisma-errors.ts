@@ -12,9 +12,9 @@ export function isPrismaApiKeyError(message: string): boolean {
 
 export function getPrismaApiKeyErrorMessage(): string {
   return (
-    'Credenciais do Prisma Postgres expiradas ou inválidas. ' +
-    'No dashboard da Vercel: Storage → Prisma Postgres → copie novamente WORKHUB_PRISMA_DATABASE_URL, ' +
-    'depois execute: vercel env pull .env.development.local && npm run prisma:setup-env && reinicie npm run dev'
+    'Banco configurado com Prisma Postgres legado (API key inválida). ' +
+    'Na Vercel use Storage → Postgres (Neon), não db.prisma.io. ' +
+    'Depois: vercel env pull .env.development.local && npm run prisma:setup-env && redeploy.'
   );
 }
 

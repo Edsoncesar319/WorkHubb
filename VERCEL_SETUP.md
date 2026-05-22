@@ -1,131 +1,76 @@
 # Deploy na Vercel — WorkHubb
 
-Guia para publicar o projeto com **Vercel Postgres**, **Vercel Blob** e **Prisma**.
+## Arquitetura
 
-## 1. Criar projeto na Vercel
+- **ORM:** Prisma (única camada de dados em produção)
+- **Banco:** Vercel Postgres (Neon) — host `*.neon.tech`
+- **Build:** `prisma generate` → `prisma migrate deploy` → `next build`
 
-1. Importe o repositório em [vercel.com/new](https://vercel.com/new).
-2. Framework: **Next.js** (detectado automaticamente).
-3. Não altere o Build Command — o `vercel.json` já usa `npm run vercel-build`.
+> **Não use** o produto legado "Prisma Postgres" (`db.prisma.io` / `prisma+` com API key). Use **Vercel Postgres** no Storage.
 
-## 2. Banco de dados (obrigatório)
+## Passo a passo
 
-Este projeto usa **Prisma Postgres** (`db.prisma.io`) com variáveis no formato:
+### 1. Banco na Vercel
 
-- `WORKHUB_PRISMA_DATABASE_URL` — `prisma+postgres://...` (**obrigatória** para a app)
-- `WORKHUB_POSTGRES_URL` — `postgres://...@db.prisma.io` (migrations / directUrl)
-- `DATABASE_URL` — deve ser igual a `WORKHUB_PRISMA_DATABASE_URL`
+1. [vercel.com](https://vercel.com) → projeto → **Storage**
+2. **Create Database** → **Postgres** (Neon)
+3. **Connect to Project** → marque Production + Preview
 
-1. Vercel → **Storage** → **Prisma Postgres** (ou Postgres conectado ao Prisma) → **Connect to Project**
-2. Local: `vercel env pull .env.development.local`
-3. `npm run prisma:setup-env` — copia as URLs corretas para `DATABASE_URL`
-4. **Redeploy** na Vercel após conectar o Storage
+Variáveis criadas automaticamente (template Neon):
 
-### Criar tabelas (primeira vez)
+| Variável | Uso |
+|----------|-----|
+| `POSTGRES_PRISMA_URL` | Runtime Prisma (pooler) — **prioridade** |
+| `DATABASE_URL` | Igual à URL pooled |
+| `POSTGRES_URL_NON_POOLING` / `DATABASE_URL_UNPOOLED` | Migrations (`DIRECT_DATABASE_URL`) |
 
-Escolha **uma** opção:
-
-**A — SQL (recomendado se o banco está vazio)**
-
-No console SQL do Postgres na Vercel, execute o conteúdo de `scripts/create-postgres-tables.sql`.
-
-**B — Prisma**
+### 2. Desenvolvimento local
 
 ```bash
 vercel env pull .env.development.local
 npm run prisma:setup-env
-npm run prisma:push
+npm run db:validate
+npm run prisma:generate
+npm run dev
 ```
 
-## 3. Vercel Blob (opcional — fotos de perfil)
+### 3. Deploy
 
-1. **Storage** → **Blob** → conectar ao projeto.
-2. A variável `BLOB_READ_WRITE_TOKEN` é criada automaticamente.
-
-Sem Blob, o upload de avatar pode falhar; o restante da aplicação funciona.
-
-## 4. Variáveis de ambiente
-
-| Variável | Origem | Obrigatório |
-|----------|--------|-------------|
-| `POSTGRES_URL` | Vercel Postgres | Sim |
-| `POSTGRES_URL_NON_POOLING` | Vercel Postgres | Sim (migrations) |
-| `POSTGRES_PRISMA_URL` | Vercel Postgres | Recomendado |
-| `DATABASE_URL` | Auto via `lib/db/env.ts` | Não* |
-| `BLOB_READ_WRITE_TOKEN` | Vercel Blob | Não |
-
-\*Opcional: no dashboard, defina `DATABASE_URL` = valor de `POSTGRES_PRISMA_URL` (redundante se o Storage já estiver ligado).
-
-## 5. Build na Vercel
-
-Scripts configurados em `package.json`:
-
-- `postinstall` → `prisma generate`
-- `vercel-build` → `prisma generate && next build`
-
-Em produção, as APIs usam **Drizzle** + `@vercel/postgres` (`lib/db/index.ts`). O Prisma Client é gerado no build para uso futuro e ferramentas (`prisma studio`, migrations).
-
-## 6. Deploy
+Push no Git ou:
 
 ```bash
-# CLI (opcional)
-npm i -g vercel
-vercel link
 vercel --prod
 ```
 
-Ou faça push na branch conectada ao Git.
+O `vercel-build` aplica migrations automaticamente se o banco estiver ligado ao projeto.
 
-## 7. Verificar localmente antes do deploy
+### 4. Vercel Blob (opcional)
+
+Storage → Blob → Connect → `BLOB_READ_WRITE_TOKEN`
+
+## Verificação
+
+| URL | Esperado |
+|-----|----------|
+| `/api/health/db` | `{ "ok": true }` |
+| `npm run db:validate` | `✅ Conexão Prisma OK` |
+
+## Troubleshooting
+
+### `P6002` / API key inválida
+
+Você está usando Prisma Postgres legado (`db.prisma.io`). **Migre para Vercel Postgres (Neon)** no Storage.
+
+### `migrate deploy` falha no build
+
+1. Storage conectado ao projeto?
+2. Variáveis em Production?
+3. Rode local: `DATABASE_URL="..." DIRECT_DATABASE_URL="..." npx prisma migrate deploy`
+
+### Tabelas não existem
 
 ```bash
-vercel env pull .env.development.local
-npm run prisma:setup-env
-npm run prisma:generate
-npx tsx scripts/test-db-connection.ts
-npx tsx scripts/verify-deploy.ts
-npm run build
+npm run prisma:migrate:deploy
+# ou
+npm run prisma:push
 ```
-
-## Problemas comuns
-
-### Erro: `API key is invalid` (P6002) ou conexão com Prisma Postgres
-
-A URL `WORKHUB_PRISMA_DATABASE_URL` expirou ou está incorreta.
-
-1. Vercel Dashboard → **Storage** → seu Prisma Postgres → aba **.env.local** ou **Connect**
-2. Copie de novo `WORKHUB_PRISMA_DATABASE_URL`
-3. Em **Settings → Environment Variables**, atualize `DATABASE_URL` com esse valor
-4. Local: `vercel env pull` + `npm run prisma:setup-env`
-5. **Redeploy**
-
-### Erro: `missing_connection_string` / `POSTGRES_URL env var was found`
-
-O Postgres **não está ligado** ao projeto ou o deploy foi feito **antes** de conectar o Storage.
-
-1. Vercel Dashboard → seu projeto → **Storage** → **Postgres** (ou Neon) → **Connect to Project**
-2. Marque os ambientes **Production** e **Preview**
-3. **Redeploy** (Deployments → ⋮ → Redeploy) — variáveis só entram em runtime após novo deploy
-4. Confira em **Settings → Environment Variables** se existem `POSTGRES_URL` ou `DATABASE_URL`
-
-Opcional: defina manualmente `DATABASE_URL` com o mesmo valor de `POSTGRES_URL` (ou `POSTGRES_PRISMA_URL`).
-
-### Build falha: `Environment variable not found: DATABASE_URL`
-
-Conecte o **Vercel Postgres** ao projeto. As variáveis `POSTGRES_*` precisam existir no ambiente de **Production** e **Preview**.
-
-### API retorna erro de banco
-
-1. Confirme que as tabelas existem (`scripts/create-postgres-tables.sql` ou `prisma db push`).
-2. Veja logs em **Vercel** → **Deployments** → **Functions**.
-3. Rode `npx tsx scripts/test-db-connection.ts` com env local do `vercel env pull`.
-
-### Upload de imagem falha
-
-Configure **Vercel Blob** e confira `BLOB_READ_WRITE_TOKEN` no projeto.
-
-## Referências
-
-- [Vercel Postgres](https://vercel.com/docs/storage/vercel-postgres)
-- [Prisma + Vercel](https://www.prisma.io/docs/guides/deployment/deployment-guides/deploying-to-vercel)
-- [PRISMA_SETUP.md](./PRISMA_SETUP.md) — uso do Prisma no dia a dia

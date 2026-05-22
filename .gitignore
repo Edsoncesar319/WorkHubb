@@ -29,5 +29,4 @@ next-env.d.ts
 .vercel
 .env*.local
 
-# prisma
-prisma/migrations
+# prisma — migrations devem ir para o Git (deploy Vercel)

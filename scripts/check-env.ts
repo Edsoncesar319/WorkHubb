@@ -9,32 +9,17 @@ async function main() {
     }
   }
 
-  const { ensureDatabaseEnv, getDatabaseConfigStatus } =
-    await import('../lib/db/env');
+  const { getDatabaseConfigStatus, ensureDatabaseEnv } = await import('../lib/db/env');
   ensureDatabaseEnv();
-
   const status = getDatabaseConfigStatus();
-  console.log('\nVariáveis:', status.varsPresent.join(', ') || '(nenhuma)');
-  console.log('Modo:', status.mode);
-  if (status.hint) console.log('Dica:', status.hint);
 
+  console.log('\nStatus:', JSON.stringify(status, null, 2));
   if (!status.ok) process.exit(1);
 
-  if (status.mode === 'prisma') {
-    const { prisma } = await import('../lib/db/prisma');
-    const r = await prisma.$queryRaw<{ ok: number }[]>`SELECT 1 as ok`;
-    console.log('\n✅ Prisma Postgres OK:', r[0]);
-    await prisma.$disconnect();
-    return;
-  }
-
-  const { getPostgresPoolUrl } = await import('../lib/db/env');
-  const pool = getPostgresPoolUrl()!;
-  const postgres = (await import('postgres')).default;
-  const sql = postgres(pool, { ssl: 'require', max: 1 });
-  const r = await sql`SELECT 1 as ok`;
-  console.log('\n✅ postgres-js OK:', r[0]);
-  await sql.end();
+  const { prisma } = await import('../lib/db/prisma');
+  await prisma.$queryRaw`SELECT 1`;
+  console.log('\n✅ OK');
+  await prisma.$disconnect();
 }
 
 main();

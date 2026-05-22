@@ -1,71 +1,43 @@
 #!/usr/bin/env tsx
-/**
- * Valida WORKHUB_PRISMA_DATABASE_URL e testa conexão.
- * Execute: npm run db:validate
- */
 import { config } from 'dotenv';
 import { existsSync } from 'fs';
+import { getDatabaseConfigStatus, ensureDatabaseEnv } from '../lib/db/env';
 
 async function main() {
   for (const f of ['.env.development.local', '.env.local', '.env']) {
     if (existsSync(f)) config({ path: f });
   }
 
-  const prismaUrl = process.env.WORKHUB_PRISMA_DATABASE_URL?.replace(
-    /^["']|["']$/g,
-    ''
-  );
-  const databaseUrl = process.env.DATABASE_URL?.replace(/^["']|["']$/g, '');
+  ensureDatabaseEnv();
+  const status = getDatabaseConfigStatus();
 
-  console.log('\n🔍 Validação Prisma Postgres\n');
+  console.log('\n🔍 Diagnóstico do banco\n');
+  console.log('Variáveis:', status.varsPresent.join(', ') || '(nenhuma)');
+  console.log('Host:', status.host);
+  console.log('Origem:', status.source);
 
-  if (!prismaUrl) {
-    console.log('❌ WORKHUB_PRISMA_DATABASE_URL não encontrada');
-    console.log('\n📋 Como corrigir:');
-    console.log('1. vercel.com → projeto → Storage → Prisma Postgres');
-    console.log('2. Connect to Project');
-    console.log('3. vercel env pull .env.development.local');
-    console.log('4. npm run prisma:setup-env\n');
+  if (status.hint) console.log('\n⚠️ ', status.hint);
+
+  if (!status.ok) {
+    console.log('\n❌ DATABASE_URL não resolvida\n');
     process.exit(1);
   }
 
-  console.log(
-    'WORKHUB_PRISMA_DATABASE_URL:',
-    prismaUrl.startsWith('prisma+') ? 'prisma+ ✅' : '⚠️  deveria ser prisma+postgres://'
-  );
-  console.log(
-    'DATABASE_URL:',
-    databaseUrl?.startsWith('prisma+')
-      ? 'prisma+ ✅'
-      : databaseUrl
-        ? '⚠️  diferente de prisma+'
-        : '❌ ausente'
-  );
-
-  if (!databaseUrl?.startsWith('prisma+')) {
-    console.log('\n💡 Execute: npm run prisma:setup-env\n');
+  if (status.host === 'db.prisma.io') {
+    console.log('\n❌ db.prisma.io não é suportado de forma confiável.');
+    console.log('   Use Vercel Postgres (Neon): host deve ser *.neon.tech\n');
+    process.exit(1);
   }
 
-  process.env.DATABASE_URL = prismaUrl;
-
-  const { PrismaClient } = await import('@prisma/client');
-  const prisma = new PrismaClient();
-
+  const { prisma } = await import('../lib/db/prisma');
   try {
     await prisma.$queryRaw`SELECT 1 as ok`;
-    console.log('\n✅ Conexão OK — API key válida\n');
+    console.log('\n✅ Conexão Prisma OK — pronto para deploy\n');
   } catch (e: unknown) {
     const msg = (e as { message?: string }).message || String(e);
-    console.log('\n❌ Conexão falhou\n');
+    console.log('\n❌ Falha:', msg.slice(0, 200));
     if (msg.includes('P6002') || msg.includes('API key')) {
-      console.log('Causa: API key do Prisma Postgres EXPIRADA ou INVÁLIDA.\n');
-      console.log('Correção (obrigatória):');
-      console.log('1. Vercel → Storage → Prisma Postgres → reconecte ao projeto');
-      console.log('2. vercel env pull .env.development.local');
-      console.log('3. npm run prisma:setup-env');
-      console.log('4. Reinicie: npm run dev\n');
-    } else {
-      console.log(msg.slice(0, 300));
+      console.log('\n→ Troque para Vercel Postgres (Neon), não Prisma Postgres (db.prisma.io)\n');
     }
     process.exit(1);
   } finally {
