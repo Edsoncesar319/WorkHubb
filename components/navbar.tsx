@@ -4,16 +4,25 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { getCurrentUser, logout } from "@/lib/auth"
+import { getUnreadCount } from "@/lib/chat"
 import type { User } from "@/lib/types"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 
 export function Navbar() {
   const pathname = usePathname()
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
+  const [unreadCount, setUnreadCount] = useState(0)
 
   useEffect(() => {
-    setUser(getCurrentUser())
+    const current = getCurrentUser()
+    setUser(current)
+    if (!current) {
+      setUnreadCount(0)
+      return
+    }
+    getUnreadCount(current.id).then(setUnreadCount).catch(() => setUnreadCount(0))
   }, [pathname])
 
   const handleLogout = () => {
@@ -57,6 +66,20 @@ export function Navbar() {
                     Dashboard
                   </Link>
                 )}
+
+                <Link
+                  href="/messages"
+                  className={`text-sm font-medium transition-colors hover:text-primary flex items-center gap-1.5 ${
+                    pathname === "/messages" ? "text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  Mensagens
+                  {unreadCount > 0 && (
+                    <Badge variant="default" className="h-5 min-w-5 px-1 text-[10px]">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </Badge>
+                  )}
+                </Link>
 
                 <Link
                   href="/profile"

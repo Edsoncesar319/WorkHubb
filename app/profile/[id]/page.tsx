@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { getCurrentUser } from "@/lib/auth"
+import { ChatMessageButton } from "@/components/chat-message-button"
 import { getCandidateProfile, type CandidateProfile } from "@/lib/data"
 import { useDatabaseSync } from "@/hooks/use-database-sync"
 import {
@@ -133,11 +134,18 @@ export default function CandidateProfilePage() {
             </Avatar>
 
             <div className="flex-1 space-y-4">
+              <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <h1 className="text-3xl font-bold">{candidate.name}</h1>
                 <Badge variant="secondary" className="mt-2">
                   Candidato
                 </Badge>
+              </div>
+              <ChatMessageButton
+                otherUserId={candidate.id}
+                jobId={jobId}
+                label="Enviar mensagem"
+              />
               </div>
 
               {candidate.bio && (

@@ -43,6 +43,7 @@ import {
   Trash2
 } from "lucide-react"
 import Link from "next/link"
+import { ChatMessageButton } from "@/components/chat-message-button"
 import { WorkModeBadge } from "@/components/work-mode-badge"
 import { getWorkMode, workModeLabel } from "@/lib/work-mode"
 
@@ -957,15 +958,20 @@ export default function ProfilePage() {
                           </div>
                         )}
 
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                         <Link href={`/jobs/${app.job.id}`}>
                           <Button variant="outline" size="sm">
                             Ver Vaga
                           </Button>
                         </Link>
-                          <Button variant="ghost" size="sm">
-                            Ver Status
-                          </Button>
+                        {app.job.authorId && (
+                          <ChatMessageButton
+                            otherUserId={app.job.authorId}
+                            jobId={app.job.id}
+                            size="sm"
+                            label="Falar com empresa"
+                          />
+                        )}
                         </div>
                       </div>
                     ) : (
@@ -1260,6 +1266,11 @@ export default function ProfilePage() {
                                             Ver perfil
                                           </Button>
                                         </Link>
+                                        <ChatMessageButton
+                                          otherUserId={candidate.id}
+                                          jobId={job.id}
+                                          size="sm"
+                                        />
                                         {candidate.resumeUrl && (
                                           <a
                                             href={candidate.resumeUrl}

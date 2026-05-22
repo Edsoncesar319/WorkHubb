@@ -27,9 +27,12 @@ model User {
   resumeFileName String?  @map("resume_file_name")
   createdAt      DateTime @default(now()) @map("created_at")
 
-  jobs         Job[]
-  applications Application[]
-  experiences  Experience[]
+  jobs              Job[]
+  applications      Application[]
+  experiences       Experience[]
+  conversationsAsP1 Conversation[] @relation("ConversationP1")
+  conversationsAsP2 Conversation[] @relation("ConversationP2")
+  sentMessages      Message[]
 
   @@map("users")
 }
@@ -47,8 +50,9 @@ model Job {
   authorId     String   @map("author_id")
   createdAt    DateTime @default(now()) @map("created_at")
 
-  author       User          @relation(fields: [authorId], references: [id])
-  applications Application[]
+  author        User           @relation(fields: [authorId], references: [id])
+  applications  Application[]
+  conversations Conversation[]
 
   @@map("jobs")
 }
@@ -81,4 +85,36 @@ model Experience {
   user User @relation(fields: [userId], references: [id])
 
   @@map("experiences")
+}
+
+model Conversation {
+  id             String   @id
+  participant1Id String   @map("participant_1_id")
+  participant2Id String   @map("participant_2_id")
+  jobId          String?  @map("job_id")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  participant1 User      @relation("ConversationP1", fields: [participant1Id], references: [id])
+  participant2 User      @relation("ConversationP2", fields: [participant2Id], references: [id])
+  job          Job?      @relation(fields: [jobId], references: [id])
+  messages     Message[]
+
+  @@unique([participant1Id, participant2Id])
+  @@map("conversations")
+}
+
+model Message {
+  id             String    @id
+  conversationId String    @map("conversation_id")
+  senderId       String    @map("sender_id")
+  content        String
+  readAt         DateTime? @map("read_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id])
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
 }

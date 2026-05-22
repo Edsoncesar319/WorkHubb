@@ -12,6 +12,7 @@ import { getCurrentUser } from "@/lib/auth"
 import type { Job } from "@/lib/types"
 import { MapPin, DollarSign, Building2, ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import { ChatMessageButton } from "@/components/chat-message-button"
 import { WorkModeBadge } from "@/components/work-mode-badge"
 
 export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -164,6 +165,21 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               <Button onClick={() => setShowApplicationForm(true)} className="w-full glow-effect" size="lg">
                 Candidatar-se
               </Button>
+            )}
+
+            {user && user.type === "professional" && job.authorId && user.id !== job.authorId && (
+              <div className="pt-4 border-t border-border">
+                <p className="text-sm text-muted-foreground mb-3">
+                  Tire dúvidas com quem publicou a vaga
+                </p>
+                <ChatMessageButton
+                  otherUserId={job.authorId}
+                  jobId={job.id}
+                  variant="outline"
+                  className="w-full"
+                  label="Falar com a empresa"
+                />
+              </div>
             )}
           </Card>
         </div>
