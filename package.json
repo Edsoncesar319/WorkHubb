@@ -6,6 +6,7 @@
     "build": "prisma generate && next build",
     "postinstall": "tsx scripts/sync-prisma-env.ts && prisma generate",
     "vercel-build": "tsx scripts/vercel-build.ts",
+    "predev": "dotenv -e .env.development.local -- prisma generate",
     "dev": "next dev",
     "lint": "eslint .",
     "start": "next start",

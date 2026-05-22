@@ -34,14 +34,16 @@ export function Navbar() {
           </Link>
 
           <div className="flex items-center gap-6">
-            <Link
-              href="/jobs"
-              className={`text-sm font-medium transition-colors hover:text-primary ${
-                pathname === "/jobs" ? "text-primary" : "text-muted-foreground"
-              }`}
-            >
-              Vagas
-            </Link>
+            {(!user || user.type !== "company") && (
+              <Link
+                href="/jobs"
+                className={`text-sm font-medium transition-colors hover:text-primary ${
+                  pathname === "/jobs" ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                Vagas
+              </Link>
+            )}
 
             {user ? (
               <>

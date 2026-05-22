@@ -257,7 +257,14 @@ export async function updateUser(id: string, user: Partial<User>): Promise<User 
     })
     if (!response.ok) {
       if (response.status === 404) return undefined
-      throw new Error('Failed to update user')
+      let errorMessage = 'Failed to update user'
+      try {
+        const errorData = await response.json()
+        errorMessage = errorData.error || errorMessage
+      } catch {
+        /* ignore */
+      }
+      throw new Error(errorMessage)
     }
     return await response.json()
   } catch (error) {

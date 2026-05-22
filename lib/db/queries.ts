@@ -201,13 +201,34 @@ export async function createUser(user: NewUser): Promise<User> {
   }
 }
 
+function buildUserUpdateData(user: Partial<NewUser>) {
+  const data: Record<string, unknown> = {};
+  if (user.name !== undefined) data.name = user.name;
+  if (user.email !== undefined) data.email = normalizeEmail(user.email);
+  if (user.type !== undefined) data.type = user.type;
+  if (user.bio !== undefined) data.bio = user.bio;
+  if (user.stack !== undefined) data.stack = user.stack;
+  if (user.github !== undefined) data.github = user.github;
+  if (user.linkedin !== undefined) data.linkedin = user.linkedin;
+  if (user.company !== undefined) data.company = user.company;
+  if (user.profilePhoto !== undefined) data.profilePhoto = user.profilePhoto;
+  if (user.resumeUrl !== undefined) data.resumeUrl = user.resumeUrl;
+  if (user.resumeFileName !== undefined) data.resumeFileName = user.resumeFileName;
+  return data;
+}
+
 export async function updateUser(
   id: string,
   user: Partial<NewUser>
 ): Promise<User | undefined> {
   try {
-    const data = user.email ? { ...user, email: normalizeEmail(user.email) } : user;
-    const row = await withPrisma((db) => db.user.update({ where: { id }, data }));
+    const data = buildUserUpdateData(user);
+    if (Object.keys(data).length === 0) {
+      return getUserById(id);
+    }
+    const row = await withPrisma((db) =>
+      db.user.update({ where: { id }, data })
+    );
     return mapUser(row);
   } catch (e) {
     handleDbError(e, 'updateUser');
