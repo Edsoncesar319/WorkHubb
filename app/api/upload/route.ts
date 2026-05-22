@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { put } from '@vercel/blob';
+import {
+  BLOB_NOT_CONFIGURED_MESSAGE,
+  getBlobConfigStatus,
+  uploadToVercelBlob,
+} from '@/lib/blob';
 
 export async function POST(request: NextRequest) {
   try {
@@ -75,10 +79,10 @@ export async function POST(request: NextRequest) {
     // Upload para Vercel Blob
     // addRandomSuffix: true garante que cada blob seja único (tratamento como imutável)
     // Isso evita problemas de cache e permite melhor performance
-    const blob = await put(blobFileName, file, {
+    const blob = await uploadToVercelBlob(blobFileName, file, {
       access: 'public',
-      addRandomSuffix: true, // Melhor prática: trata blobs como imutáveis
-      cacheControlMaxAge: 2592000, // Cache de 30 dias (padrão recomendado)
+      addRandomSuffix: true,
+      cacheControlMaxAge: 2592000,
     });
 
     return NextResponse.json({ 

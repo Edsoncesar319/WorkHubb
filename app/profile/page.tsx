@@ -302,7 +302,13 @@ export default function ProfilePage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || "Erro ao enviar currículo")
+        const msg = errorData.error || "Erro ao enviar currículo"
+        if (response.status === 503 && msg.includes("BLOB_READ_WRITE_TOKEN")) {
+          throw new Error(
+            "Configure o Vercel Blob: Storage → Blob → Connect to Project. Depois: vercel env pull .env.development.local e reinicie o npm run dev. (VERCEL_BLOB_SETUP.md)"
+          )
+        }
+        throw new Error(msg)
       }
 
       const data = await response.json()

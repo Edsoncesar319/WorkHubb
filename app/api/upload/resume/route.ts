@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { put } from '@vercel/blob';
+import {
+  BLOB_NOT_CONFIGURED_MESSAGE,
+  getBlobConfigStatus,
+  uploadToVercelBlob,
+} from '@/lib/blob';
 
 const ALLOWED_TYPES = new Set([
   'application/pdf',
@@ -12,6 +16,13 @@ const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 
 export async function POST(request: NextRequest) {
   try {
+    if (!getBlobConfigStatus().ok) {
+      return NextResponse.json(
+        { error: BLOB_NOT_CONFIGURED_MESSAGE },
+        { status: 503 }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     const userId = (formData.get('userId') as string | null)?.trim();
@@ -43,7 +54,7 @@ export async function POST(request: NextRequest) {
     const prefix = userId ? `resumes/${userId}` : 'resumes';
     const blobFileName = `${prefix}/curriculo-${Date.now()}.${safeExt}`;
 
-    const blob = await put(blobFileName, file, {
+    const blob = await uploadToVercelBlob(blobFileName, file, {
       access: 'public',
       addRandomSuffix: true,
       contentType: file.type || undefined,

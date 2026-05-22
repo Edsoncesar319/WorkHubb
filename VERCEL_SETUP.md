@@ -46,9 +46,13 @@ vercel --prod
 
 O `vercel-build` aplica migrations automaticamente se o banco estiver ligado ao projeto.
 
-### 4. Vercel Blob (opcional)
+### 4. Vercel Blob (foto de perfil e currículo)
 
-Storage → Blob → Connect → `BLOB_READ_WRITE_TOKEN`
+Storage → Blob → **Connect to Project** → `BLOB_READ_WRITE_TOKEN`
+
+Local: `vercel env pull .env.development.local` → `npm run blob:check` → `npm run dev`
+
+Guia: [VERCEL_BLOB_SETUP.md](./VERCEL_BLOB_SETUP.md)
 
 ## Verificação
 
