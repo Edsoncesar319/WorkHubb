@@ -39,7 +39,14 @@ export async function addJob(job: Omit<Job, "id" | "createdAt">): Promise<Job> {
     body: JSON.stringify(newJob),
   })
   if (!response.ok) {
-    throw new Error('Failed to create job')
+    let errorMessage = 'Não foi possível publicar a vaga'
+    try {
+      const errorData = await response.json()
+      errorMessage = errorData.error || errorMessage
+    } catch {
+      /* ignore */
+    }
+    throw new Error(errorMessage)
   }
   return await response.json()
 }

@@ -276,8 +276,16 @@ export async function createJob(job: NewJob): Promise<Job> {
     const row = await withPrisma((db) =>
       db.job.create({
         data: {
-          ...job,
+          id: job.id,
+          title: job.title,
+          company: job.company,
+          location: job.location,
+          remote: job.remote ?? false,
+          hybrid: job.hybrid ?? false,
+          salary: job.salary ?? null,
+          description: job.description,
           requirements: JSON.stringify(job.requirements),
+          authorId: job.authorId,
         },
       })
     );

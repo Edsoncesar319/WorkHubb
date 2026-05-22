@@ -14,10 +14,46 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const job = await createJob(body);
+
+    if (!body.id || !body.title || !body.company || !body.location || !body.description) {
+      return NextResponse.json(
+        { error: 'Campos obrigatórios: título, empresa, localização e descrição' },
+        { status: 400 }
+      );
+    }
+
+    const requirements = Array.isArray(body.requirements)
+      ? body.requirements
+      : typeof body.requirements === 'string'
+        ? body.requirements.split(',').map((r: string) => r.trim()).filter(Boolean)
+        : [];
+
+    const job = await createJob({
+      id: String(body.id),
+      title: String(body.title).trim(),
+      company: String(body.company).trim(),
+      location: String(body.location).trim(),
+      remote: Boolean(body.remote),
+      hybrid: Boolean(body.hybrid),
+      salary: body.salary ? String(body.salary).trim() : null,
+      description: String(body.description).trim(),
+      requirements,
+      authorId: String(body.authorId),
+    });
+
     return NextResponse.json(job, { status: 201 });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error creating job:', error);
-    return NextResponse.json({ error: 'Failed to create job' }, { status: 500 });
+    const message =
+      error instanceof Error ? error.message : 'Failed to create job';
+    const needsMigrate = message.includes('Unknown argument `hybrid`');
+    return NextResponse.json(
+      {
+        error: needsMigrate
+          ? 'Banco desatualizado. Rode: npx prisma migrate deploy && npx prisma generate'
+          : message,
+      },
+      { status: 500 }
+    );
   }
 }

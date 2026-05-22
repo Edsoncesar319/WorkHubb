@@ -34,6 +34,8 @@ export default function DashboardPage() {
     description: "",
     requirements: "",
   })
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     const currentUser = getCurrentUser()
@@ -62,30 +64,43 @@ export default function DashboardPage() {
 
     if (!user) return
 
-    const newJob = await addJob({
-      title: formData.title,
-      company: user.company || user.name,
-      location: formData.location,
-      remote: formData.remote,
-      salary: formData.salary || undefined,
-      description: formData.description,
-      requirements: formData.requirements
-        .split(",")
-        .map((r) => r.trim())
-        .filter(Boolean),
-      authorId: user.id,
-    })
+    setSubmitError(null)
+    setIsSubmitting(true)
 
-    setMyJobs([newJob, ...myJobs])
-    setShowForm(false)
-    setFormData({
-      title: "",
-      location: "",
-      workMode: "onsite",
-      salary: "",
-      description: "",
-      requirements: "",
-    })
+    try {
+      const { remote, hybrid } = workModeToFields(formData.workMode)
+      const newJob = await addJob({
+        title: formData.title,
+        company: user.company || user.name,
+        location: formData.location,
+        remote,
+        hybrid,
+        salary: formData.salary || undefined,
+        description: formData.description,
+        requirements: formData.requirements
+          .split(",")
+          .map((r) => r.trim())
+          .filter(Boolean),
+        authorId: user.id,
+      })
+
+      setMyJobs([newJob, ...myJobs])
+      setShowForm(false)
+      setFormData({
+        title: "",
+        location: "",
+        workMode: "onsite",
+        salary: "",
+        description: "",
+        requirements: "",
+      })
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Não foi possível publicar a vaga."
+      setSubmitError(message)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   if (!user) {
@@ -186,11 +201,20 @@ export default function DashboardPage() {
                 />
               </div>
 
+              {submitError && (
+                <p className="text-sm text-destructive">{submitError}</p>
+              )}
+
               <div className="flex gap-2">
-                <Button type="submit" className="glow-effect">
-                  Publicar Vaga
+                <Button type="submit" className="glow-effect" disabled={isSubmitting}>
+                  {isSubmitting ? "Publicando..." : "Publicar Vaga"}
                 </Button>
-                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isSubmitting}
+                  onClick={() => setShowForm(false)}
+                >
                   Cancelar
                 </Button>
               </div>
