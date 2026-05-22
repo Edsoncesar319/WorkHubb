@@ -52,7 +52,9 @@ export default function RegisterPage() {
         if (
           msg.includes('P6002') ||
           msg.includes('API key') ||
-          msg.includes('Credenciais do Prisma Postgres')
+          msg.includes('WORKHUB_') ||
+          msg.includes('Banco mal configurado') ||
+          msg.includes('Prisma Postgres')
         ) {
           setError(msg)
           return

@@ -8,7 +8,7 @@ export async function GET(
 ) {
   try {
     const { email: emailParam } = await params;
-    const email = decodeURIComponent(emailParam);
+    const email = decodeURIComponent(emailParam).trim().toLowerCase();
     console.log('Fetching user by email:', email);
     
     const user = await getUserByEmail(email);

@@ -1,13 +1,6 @@
 /**
- * Resolve DATABASE_URL e DIRECT_DATABASE_URL para Prisma na Vercel.
- *
- * Ordem de prioridade (produção):
- * 1. POSTGRES_PRISMA_URL — Vercel Postgres / Neon (recomendado)
- * 2. POSTGRES_URL — URL pooled (*.neon.tech, vercel-storage, etc.)
- * 3. Variáveis com prefixo do Storage (WORKHUB_*)
- * 4. prisma+postgres:// — só se não houver URL Neon direta
- *
- * NÃO usa postgres://@db.prisma.io (Prisma Postgres legado — API key instável).
+ * Resolve DATABASE_URL e DIRECT_DATABASE_URL (Neon / Vercel Postgres).
+ * Ignora WORKHUB_* e db.prisma.io quando existir URL *.neon.tech.
  */
 
 function stripQuotes(value: string | undefined): string | undefined {
@@ -19,87 +12,54 @@ function env(name: string): string | undefined {
   return stripQuotes(process.env[name]);
 }
 
-function firstDefined(...values: (string | undefined)[]): string | undefined {
-  return values.find((v) => v && v.length > 0);
-}
-
 function isPostgresProtocol(url: string): boolean {
   return url.startsWith('postgresql://') || url.startsWith('postgres://');
 }
 
-/** Prisma Postgres legado — evitar em produção */
-function isLegacyPrismaPostgresHost(url: string): boolean {
-  return url.includes('db.prisma.io') || url.includes('prisma-data.net');
-}
-
-function isPrismaAccelerateUrl(url: string): boolean {
-  return url.startsWith('prisma+');
-}
-
-/** Neon, Vercel Storage, Supabase, etc. */
-function isPreferredProductionHost(url: string): boolean {
-  if (!isPostgresProtocol(url) || isLegacyPrismaPostgresHost(url)) return false;
+function isLegacyDb(url: string): boolean {
   return (
-    url.includes('neon.tech') ||
-    url.includes('vercel-storage.com') ||
-    url.includes('supabase.co') ||
-    url.includes('pooler') ||
-    !isLegacyPrismaPostgresHost(url)
+    url.startsWith('prisma+') ||
+    url.includes('db.prisma.io') ||
+    url.includes('prisma-data.net')
   );
 }
 
-function scoreUrl(url: string | undefined): number {
-  if (!url) return -1;
-  if (isPreferredProductionHost(url)) return 100;
-  if (isPostgresProtocol(url) && !isLegacyPrismaPostgresHost(url)) return 75;
-  if (isPrismaAccelerateUrl(url)) return 15;
-  if (isLegacyPrismaPostgresHost(url)) return 5;
-  return 0;
+function isNeonUrl(url: string | undefined): boolean {
+  return !!url && url.includes('neon.tech') && isPostgresProtocol(url);
 }
 
-function filterForProduction(urls: (string | undefined)[]): (string | undefined)[] {
-  const onVercel = process.env.VERCEL === '1' || !!process.env.VERCEL_ENV;
-  if (!onVercel) return urls;
-  const allowed = urls.filter(
-    (u) =>
-      u &&
-      (isPreferredProductionHost(u) ||
-        (isPostgresProtocol(u) &&
-          !isLegacyPrismaPostgresHost(u) &&
-          !isPrismaAccelerateUrl(u)))
-  );
-  return allowed.length > 0 ? allowed : urls;
-}
-
-function pickBestUrl(...candidates: (string | undefined)[]): string | undefined {
-  const valid = candidates.filter((u): u is string => !!u && (isPostgresProtocol(u) || isPrismaAccelerateUrl(u)));
-  if (valid.length === 0) return undefined;
-  return valid.sort((a, b) => scoreUrl(b) - scoreUrl(a))[0];
-}
-
-function collectAllCandidates(): (string | undefined)[] {
-  const keys = Object.keys(process.env).filter((k) =>
-    /^(POSTGRES|DATABASE|WORKHUB|PRISMA)/i.test(k)
-  );
-  const fromEnv: (string | undefined)[] = keys.map((k) => env(k));
-  return [
-    env('POSTGRES_PRISMA_URL'),
-    env('POSTGRES_URL'),
-    env('DATABASE_URL'),
-    env('POSTGRES_URL_NON_POOLING'),
-    env('DATABASE_URL_UNPOOLED'),
-    env('WORKHUB_POSTGRES_PRISMA_URL'),
-    env('WORKHUB_PRISMA_DATABASE_URL'),
-    env('WORKHUB_POSTGRES_URL'),
-    env('WORKHUB_POSTGRES_URL_NON_POOLING'),
-    env('WORKHUB_DATABASE_URL'),
-    ...fromEnv,
-  ];
-}
-
-/** URL direta (sem pooler) — migrations / directUrl */
 function isUnpooledUrl(url: string): boolean {
   return isPostgresProtocol(url) && !url.includes('-pooler') && !url.includes('pgbouncer');
+}
+
+/** Alguma variável Neon está definida no ambiente */
+export function hasNeonConfigured(): boolean {
+  const names = [
+    'POSTGRES_PRISMA_URL',
+    'DATABASE_URL',
+    'POSTGRES_URL',
+    'DATABASE_URL_UNPOOLED',
+    'POSTGRES_URL_NON_POOLING',
+    'DIRECT_DATABASE_URL',
+  ];
+  return names.some((n) => isNeonUrl(env(n)));
+}
+
+function isUsableUrl(url: string | undefined, neonOnly: boolean): boolean {
+  if (!url || (!isPostgresProtocol(url) && !url.startsWith('prisma+'))) return false;
+  if (!neonOnly) return true;
+  return isNeonUrl(url) && !isLegacyDb(url);
+}
+
+function pickFirst(
+  names: string[],
+  neonOnly: boolean
+): { url?: string; source: string } {
+  for (const name of names) {
+    const v = env(name);
+    if (isUsableUrl(v, neonOnly)) return { url: v!, source: name };
+  }
+  return { source: 'none' };
 }
 
 export function resolveDatabaseUrls(): {
@@ -108,49 +68,52 @@ export function resolveDatabaseUrls(): {
   source: string;
   directSource: string;
 } {
-  const pooledCandidates = filterForProduction([
-    env('POSTGRES_PRISMA_URL'),
-    env('POSTGRES_URL'),
-    env('WORKHUB_POSTGRES_PRISMA_URL'),
-    env('WORKHUB_POSTGRES_URL'),
-    env('DATABASE_URL'),
-    env('WORKHUB_PRISMA_DATABASE_URL'),
-    env('WORKHUB_DATABASE_URL'),
-    ...collectAllCandidates(),
-  ]);
+  const neonOnly = hasNeonConfigured();
 
-  const pooled = pickBestUrl(...pooledCandidates);
+  const pooledNames = neonOnly
+    ? [
+        'POSTGRES_PRISMA_URL',
+        'DATABASE_URL',
+        'POSTGRES_URL',
+        'DIRECT_DATABASE_URL',
+      ]
+    : [
+        'POSTGRES_PRISMA_URL',
+        'DATABASE_URL',
+        'POSTGRES_URL',
+        'WORKHUB_POSTGRES_PRISMA_URL',
+        'WORKHUB_POSTGRES_URL',
+        'WORKHUB_PRISMA_DATABASE_URL',
+        'WORKHUB_DATABASE_URL',
+      ];
 
-  const directCandidates = filterForProduction([
-    env('DATABASE_URL_UNPOOLED'),
-    env('POSTGRES_URL_NON_POOLING'),
-    env('WORKHUB_POSTGRES_URL_NON_POOLING'),
-    ...collectAllCandidates().filter((u) => u && isUnpooledUrl(u)),
-    env('POSTGRES_URL'),
-    env('WORKHUB_POSTGRES_URL'),
-  ]);
+  const { url: pooled, source } = pickFirst(pooledNames, neonOnly);
 
-  const direct =
-    directCandidates.find((u) => u && isUnpooledUrl(u)) ??
-    pickBestUrl(...directCandidates) ??
-    pooled;
+  const directNames = neonOnly
+    ? ['DATABASE_URL_UNPOOLED', 'POSTGRES_URL_NON_POOLING', 'DIRECT_DATABASE_URL']
+    : [
+        'DATABASE_URL_UNPOOLED',
+        'POSTGRES_URL_NON_POOLING',
+        'WORKHUB_POSTGRES_URL_NON_POOLING',
+        'WORKHUB_POSTGRES_URL',
+      ];
 
-  let source = 'none';
-  if (env('POSTGRES_PRISMA_URL') && pooled === env('POSTGRES_PRISMA_URL'))
-    source = 'POSTGRES_PRISMA_URL';
-  else if (env('DATABASE_URL') && pooled === env('DATABASE_URL'))
-    source = 'DATABASE_URL';
-  else if (env('POSTGRES_URL') && pooled === env('POSTGRES_URL'))
-    source = 'POSTGRES_URL';
-  else if (pooled?.startsWith('prisma+')) source = 'prisma+ (accelerate)';
-  else if (pooled) source = 'resolved';
+  let { url: direct, source: directSource } = pickFirst(directNames, neonOnly);
 
-  const directSource =
-    direct === env('DATABASE_URL_UNPOOLED')
-      ? 'DATABASE_URL_UNPOOLED'
-      : direct === env('POSTGRES_URL_NON_POOLING')
-        ? 'POSTGRES_URL_NON_POOLING'
-        : 'resolved';
+  if (direct && !isUnpooledUrl(direct)) {
+    const unpooled = directNames
+      .map((n) => env(n))
+      .find((u) => u && isUnpooledUrl(u));
+    if (unpooled) {
+      direct = unpooled;
+      directSource = 'unpooled';
+    }
+  }
+
+  if (!direct && pooled && isUnpooledUrl(pooled)) {
+    direct = pooled;
+    directSource = source;
+  }
 
   return {
     databaseUrl: pooled,
@@ -160,21 +123,44 @@ export function resolveDatabaseUrls(): {
   };
 }
 
+export function getPostgresPoolUrl(): string | undefined {
+  ensureDatabaseEnv();
+  return resolveDatabaseUrls().databaseUrl;
+}
+
+/** Parâmetros recomendados para Neon serverless / Vercel */
+function withNeonServerlessParams(url: string, pooled: boolean): string {
+  if (!url.includes('neon.tech')) return url;
+  let u = url;
+  const add = (key: string, val: string) => {
+    if (u.includes(`${key}=`)) return;
+    u += (u.includes('?') ? '&' : '?') + `${key}=${val}`;
+  };
+  add('sslmode', 'require');
+  if (pooled) {
+    add('connect_timeout', '15');
+    if (u.includes('-pooler')) add('pgbouncer', 'true');
+    add('connection_limit', '1');
+  }
+  return u;
+}
+
 export function ensureDatabaseEnv(): void {
   const { databaseUrl, directDatabaseUrl } = resolveDatabaseUrls();
 
   if (databaseUrl) {
-    process.env.DATABASE_URL = databaseUrl;
+    process.env.DATABASE_URL = withNeonServerlessParams(databaseUrl, true);
   }
   if (directDatabaseUrl) {
-    process.env.DIRECT_DATABASE_URL = directDatabaseUrl;
-    process.env.POSTGRES_URL_NON_POOLING = directDatabaseUrl;
+    const direct = withNeonServerlessParams(directDatabaseUrl, false);
+    process.env.DIRECT_DATABASE_URL = direct;
+    process.env.POSTGRES_URL_NON_POOLING = direct;
   }
-  if (databaseUrl && !process.env.POSTGRES_URL) {
-    process.env.POSTGRES_URL = databaseUrl;
+  if (process.env.DATABASE_URL && !process.env.POSTGRES_URL) {
+    process.env.POSTGRES_URL = process.env.DATABASE_URL;
   }
-  if (databaseUrl?.startsWith('prisma+')) {
-    process.env.PRISMA_CLIENT_ENGINE_TYPE = 'dataproxy';
+  if (process.env.DATABASE_URL && !process.env.POSTGRES_PRISMA_URL) {
+    process.env.POSTGRES_PRISMA_URL = process.env.DATABASE_URL;
   }
 }
 
@@ -182,36 +168,46 @@ export function getDatabaseConfigStatus(): {
   ok: boolean;
   source: string;
   host: string;
+  neon: boolean;
   varsPresent: string[];
   hint?: string;
 } {
   ensureDatabaseEnv();
   const { databaseUrl, source } = resolveDatabaseUrls();
-  const varsPresent = Object.keys(process.env).filter((k) =>
-    /^(POSTGRES|DATABASE|DIRECT|WORKHUB)/i.test(k)
+  const neon = hasNeonConfigured();
+
+  const varsPresent = Object.keys(process.env).filter(
+    (k) => /^(POSTGRES|DATABASE|DIRECT)/i.test(k) && !!process.env[k]
   );
 
   let host = 'unknown';
   if (databaseUrl) {
     try {
-      const u = databaseUrl.replace(/^prisma\+/, '');
-      host = new URL(u).hostname;
+      host = new URL(databaseUrl.replace(/^prisma\+/, '')).hostname;
     } catch {
       host = 'invalid-url';
     }
   }
 
-  const ok = !!databaseUrl;
   let hint: string | undefined;
-  if (!ok) {
+  if (!databaseUrl) {
+    hint = 'Conecte Vercel Postgres (Neon) ao projeto e faça redeploy.';
+  } else if (!neon && (host === 'db.prisma.io' || databaseUrl.startsWith('prisma+'))) {
     hint =
-      'Conecte Vercel Postgres (Neon) ao projeto: Storage → Postgres → Connect. Depois redeploy.';
-  } else if (isLegacyPrismaPostgresHost(databaseUrl)) {
+      'Remova variáveis WORKHUB_* / Prisma Postgres na Vercel. Use apenas Neon (POSTGRES_PRISMA_URL).';
+  } else if (neon && varsPresent.some((k) => k.startsWith('WORKHUB_'))) {
     hint =
-      'URL aponta para db.prisma.io (legado). Recomendado: use Vercel Postgres/Neon (host *.neon.tech).';
+      'Neon detectado, mas WORKHUB_* ainda existe — apague WORKHUB_* nas env vars da Vercel.';
   }
 
-  return { ok, source, host, varsPresent, hint };
+  return {
+    ok: !!databaseUrl && (neon || !isLegacyDb(databaseUrl)),
+    source,
+    host,
+    neon,
+    varsPresent,
+    hint,
+  };
 }
 
 ensureDatabaseEnv();

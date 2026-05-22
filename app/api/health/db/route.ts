@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDatabaseConfigStatus } from '@/lib/db/env';
 import { formatPrismaError } from '@/lib/db/prisma-errors';
-import { prisma } from '@/lib/db/prisma';
+import { withPrisma } from '@/lib/db/prisma';
 
 export async function GET() {
   const status = getDatabaseConfigStatus();
@@ -19,19 +19,20 @@ export async function GET() {
     );
   }
 
-  if (status.host === 'db.prisma.io') {
+  if (!status.neon && (status.host === 'db.prisma.io' || status.host.includes('prisma'))) {
     return NextResponse.json(
       {
         ok: false,
         code: 'LEGACY_PRISMA_POSTGRES',
-        hint: 'Use Vercel Postgres (Neon) em vez de db.prisma.io',
+        hint:
+          'Apague WORKHUB_* na Vercel. Use Neon: POSTGRES_PRISMA_URL (*.neon.tech)',
       },
       { status: 503 }
     );
   }
 
   try {
-    await prisma.$queryRaw`SELECT 1 as ok`;
+    await withPrisma((db) => db.$queryRaw`SELECT 1 as ok`);
     return NextResponse.json({
       ok: true,
       host: status.host,

@@ -1,4 +1,4 @@
-/** Mensagens amigáveis para erros do Prisma Postgres / Data Proxy */
+import { hasNeonConfigured } from './env';
 
 export const PRISMA_API_KEY_INVALID_CODE = 'PRISMA_API_KEY_INVALID';
 
@@ -11,9 +11,14 @@ export function isPrismaApiKeyError(message: string): boolean {
 }
 
 export function getPrismaApiKeyErrorMessage(): string {
+  if (hasNeonConfigured()) {
+    return (
+      'Conexão com o banco falhou. Reinicie o servidor (npm run dev) e confira POSTGRES_PRISMA_URL no .env.development.local.'
+    );
+  }
   return (
-    'Banco configurado com Prisma Postgres legado (API key inválida). ' +
-    'Na Vercel use Storage → Postgres (Neon), não db.prisma.io. ' +
+    'Variáveis antigas do Prisma Postgres (WORKHUB_* / db.prisma.io) ainda ativas. ' +
+    'Na Vercel: apague WORKHUB_* e use Storage → Postgres (Neon). ' +
     'Depois: vercel env pull .env.development.local && npm run prisma:setup-env && redeploy.'
   );
 }
@@ -36,8 +41,9 @@ export function formatPrismaError(error: unknown): {
 
   if (message.includes("Can't reach database server")) {
     return {
-      message:
-        'Não foi possível conectar ao Prisma Postgres. Regenere as variáveis no Storage da Vercel e faça vercel env pull.',
+      message: hasNeonConfigured()
+        ? 'Não foi possível alcançar o Neon. Verifique POSTGRES_URL_NON_POOLING e a rede.'
+        : 'Configure Neon na Vercel (Storage → Postgres) e rode vercel env pull.',
       code: 'DB_UNREACHABLE',
       status: 503,
     };
