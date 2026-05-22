@@ -22,7 +22,9 @@ Variáveis criadas automaticamente (template Neon):
 |----------|-----|
 | `POSTGRES_PRISMA_URL` | Runtime Prisma (pooler) — **prioridade** |
 | `DATABASE_URL` | Igual à URL pooled |
-| `POSTGRES_URL_NON_POOLING` / `DATABASE_URL_UNPOOLED` | Migrations (`DIRECT_DATABASE_URL`) |
+| `POSTGRES_URL_NON_POOLING` / `DATABASE_URL_UNPOOLED` | Migrations (`directUrl` no Prisma) |
+
+O build usa `scripts/vercel-build.ts`, que mapeia `POSTGRES_PRISMA_URL` → `DATABASE_URL` e `POSTGRES_URL_NON_POOLING` antes do `migrate deploy`. **Não é obrigatório** criar `DIRECT_DATABASE_URL` manualmente na Vercel.
 
 ### 2. Desenvolvimento local
 
@@ -67,9 +69,12 @@ Você está usando Prisma Postgres legado (`db.prisma.io`). **Migre para Vercel 
 
 ### `migrate deploy` falha no build
 
-1. Storage conectado ao projeto?
-2. Variáveis em Production?
-3. Rode local: `DATABASE_URL="..." DIRECT_DATABASE_URL="..." npx prisma migrate deploy`
+**`Environment variable not found: DIRECT_DATABASE_URL`** — corrigido no código: use `POSTGRES_URL_NON_POOLING` (Neon na Vercel já injeta).
+
+1. Storage **Postgres (Neon)** conectado ao projeto?
+2. Variáveis em **Production** (não só Preview)?
+3. Redeploy após conectar o banco
+4. Local: `npm run prisma:setup-env` e `npm run vercel-build`
 
 ### Tabelas não existem
 

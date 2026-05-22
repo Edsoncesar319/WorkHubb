@@ -6,10 +6,10 @@ generator client {
 
 datasource db {
   provider  = "postgresql"
-  // Pooled — Vercel injeta POSTGRES_PRISMA_URL; lib/db/env.ts normaliza DATABASE_URL
+  // Pooled — runtime (Vercel: POSTGRES_PRISMA_URL → DATABASE_URL via ensure-prisma-build-env)
   url       = env("DATABASE_URL")
-  // Direct — migrations / db push (POSTGRES_URL_NON_POOLING)
-  directUrl = env("DIRECT_DATABASE_URL")
+  // Direct — migrations (Vercel injeta POSTGRES_URL_NON_POOLING ou DATABASE_URL_UNPOOLED)
+  directUrl = env("POSTGRES_URL_NON_POOLING")
 }
 
 model User {
