@@ -1,7 +1,4 @@
-/**
- * Ponto de entrada do banco — produção usa Prisma (@/lib/db/prisma).
- * Tipos Drizzle em ./schema mantidos para compatibilidade de tipos nas APIs.
- */
+/** Ponto de entrada do banco — Prisma + tipos de domínio */
 export { prisma, disconnectPrisma } from './prisma';
-export * from './schema';
+export * from './types';
 export * from './queries';

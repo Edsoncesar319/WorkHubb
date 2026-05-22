@@ -13,7 +13,7 @@ import type {
   NewApplication,
   Experience,
   NewExperience,
-} from './schema';
+} from './types';
 
 function mapUser(row: {
   id: string;

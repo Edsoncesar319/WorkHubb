@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Garantir que campos opcionais sejam null ao invés de undefined
-    // createdAt não precisa ser passado pois tem defaultNow() no schema
+    // createdAt tem default no banco (Prisma @default(now()))
     const userData: any = {
       id: String(body.id),
       name: String(body.name).trim(),

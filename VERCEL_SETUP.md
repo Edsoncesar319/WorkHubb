@@ -57,6 +57,10 @@ Storage → Blob → Connect → `BLOB_READ_WRITE_TOKEN`
 
 ## Troubleshooting
 
+### Erros no console do **dashboard** vercel.com
+
+CSP de fontes (`blob.vercel-storage.com`), `/api/chat/.../stream` 404, `turborepo-summary` 404 e avisos de `preload` são do **painel da Vercel**, não do WorkHubb. Veja [TROUBLESHOOTING_CONSOLE.md](./TROUBLESHOOTING_CONSOLE.md).
+
 ### `P6002` / API key inválida
 
 Você está usando Prisma Postgres legado (`db.prisma.io`). **Migre para Vercel Postgres (Neon)** no Storage.
