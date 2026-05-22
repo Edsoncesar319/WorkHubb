@@ -12,6 +12,26 @@ const { databaseUrl, directDatabaseUrl } = resolveDatabaseUrls();
 
 if (!databaseUrl) {
   const onVercel = process.env.VERCEL === '1';
+  const isPostinstall = process.env.npm_lifecycle_event === 'postinstall';
+
+  // postinstall: só precisa gerar o client — placeholder evita falha no npm install
+  if (onVercel && isPostinstall) {
+    const placeholder =
+      'postgresql://build:build@127.0.0.1:5432/build?schema=public';
+    writeFileSync(
+      join(process.cwd(), '.env'),
+      `DATABASE_URL="${placeholder}"\nPOSTGRES_URL_NON_POOLING="${placeholder}"\n`,
+      'utf-8'
+    );
+    console.warn(
+      '⚠️  postinstall: Postgres não ligado ao projeto — placeholder para prisma generate.'
+    );
+    console.warn(
+      '   Vercel → Storage → Postgres (Neon) → Connect to Project → Production.'
+    );
+    process.exit(0);
+  }
+
   if (onVercel) {
     console.error(
       '❌ Postgres não configurado. Vercel → Storage → Postgres (Neon) → Connect to Project.'

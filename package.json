@@ -19,6 +19,7 @@
     "prisma:studio": "prisma studio",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:setup-env": "tsx scripts/setup-prisma-env.ts",
+    "vercel:env:push-db": "tsx scripts/push-vercel-db-env.ts",
     "db:check": "tsx scripts/check-env.ts",
     "db:validate": "tsx scripts/validate-prisma-env.ts"
   },

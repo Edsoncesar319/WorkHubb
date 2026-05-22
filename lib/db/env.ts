@@ -34,15 +34,11 @@ function isUnpooledUrl(url: string): boolean {
 
 /** Alguma variável Neon está definida no ambiente */
 export function hasNeonConfigured(): boolean {
-  const names = [
-    'POSTGRES_PRISMA_URL',
-    'DATABASE_URL',
-    'POSTGRES_URL',
-    'DATABASE_URL_UNPOOLED',
-    'POSTGRES_URL_NON_POOLING',
-    'DIRECT_DATABASE_URL',
-  ];
-  return names.some((n) => isNeonUrl(env(n)));
+  for (const [key, value] of Object.entries(process.env)) {
+    if (!/POSTGRES|DATABASE|PGHOST/i.test(key)) continue;
+    if (isNeonUrl(stripQuotes(value))) return true;
+  }
+  return false;
 }
 
 function isUsableUrl(url: string | undefined, neonOnly: boolean): boolean {
@@ -58,6 +54,57 @@ function pickFirst(
   for (const name of names) {
     const v = env(name);
     if (isUsableUrl(v, neonOnly)) return { url: v!, source: name };
+  }
+  return { source: 'none' };
+}
+
+function pickEnvSuffix(suffixes: string[]): { value?: string; source: string } {
+  for (const suffix of suffixes) {
+    const v = env(suffix);
+    if (v) return { value: v, source: suffix };
+    for (const key of Object.keys(process.env)) {
+      if (key.endsWith(`_${suffix}`)) {
+        const val = env(key);
+        if (val) return { value: val, source: key };
+      }
+    }
+  }
+  return { source: 'none' };
+}
+
+/** Monta URL quando só existem PGHOST / PGUSER / PGPASSWORD / PGDATABASE (Vercel Storage) */
+function assembleUrlFromParts(pooled: boolean): { url?: string; source: string } {
+  const host = pickEnvSuffix(
+    pooled ? ['POSTGRES_HOST', 'PGHOST'] : ['PGHOST_UNPOOLED', 'POSTGRES_HOST', 'PGHOST']
+  ).value;
+  const user = pickEnvSuffix(['POSTGRES_USER', 'PGUSER']).value;
+  const password = pickEnvSuffix(['POSTGRES_PASSWORD', 'PGPASSWORD']).value;
+  const database = pickEnvSuffix(['POSTGRES_DATABASE', 'PGDATABASE']).value;
+
+  if (!host || !user || !password || !database) {
+    return { source: 'none' };
+  }
+
+  const source = pooled ? 'assembled:pooled' : 'assembled:direct';
+  const url = `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}/${database}?sslmode=require`;
+  return { url, source };
+}
+
+/** Vercel Storage usa prefixo ex.: DATABASE_db_POSTGRES_PRISMA_URL */
+function pickBySuffix(
+  suffixes: string[],
+  neonOnly: boolean
+): { url?: string; source: string } {
+  const exact = pickFirst(suffixes, neonOnly);
+  if (exact.url) return exact;
+
+  for (const suffix of suffixes) {
+    for (const key of Object.keys(process.env)) {
+      if (key === suffix || key.endsWith(`_${suffix}`)) {
+        const v = env(key);
+        if (isUsableUrl(v, neonOnly)) return { url: v!, source: key };
+      }
+    }
   }
   return { source: 'none' };
 }
@@ -87,7 +134,14 @@ export function resolveDatabaseUrls(): {
         'WORKHUB_DATABASE_URL',
       ];
 
-  const { url: pooled, source } = pickFirst(pooledNames, neonOnly);
+  let { url: pooled, source } = pickBySuffix(pooledNames, neonOnly);
+  if (!pooled) {
+    const assembled = assembleUrlFromParts(true);
+    if (assembled.url) {
+      pooled = assembled.url;
+      source = assembled.source;
+    }
+  }
 
   const directNames = neonOnly
     ? ['DATABASE_URL_UNPOOLED', 'POSTGRES_URL_NON_POOLING', 'DIRECT_DATABASE_URL']
@@ -98,11 +152,15 @@ export function resolveDatabaseUrls(): {
         'WORKHUB_POSTGRES_URL',
       ];
 
-  let { url: direct, source: directSource } = pickFirst(directNames, neonOnly);
+  let { url: direct, source: directSource } = pickBySuffix(directNames, neonOnly);
 
   if (direct && !isUnpooledUrl(direct)) {
     const unpooled = directNames
-      .map((n) => env(n))
+      .flatMap((suffix) =>
+        Object.keys(process.env)
+          .filter((k) => k === suffix || k.endsWith(`_${suffix}`))
+          .map((k) => env(k))
+      )
       .find((u) => u && isUnpooledUrl(u));
     if (unpooled) {
       direct = unpooled;
@@ -113,6 +171,14 @@ export function resolveDatabaseUrls(): {
   if (!direct && pooled && isUnpooledUrl(pooled)) {
     direct = pooled;
     directSource = source;
+  }
+
+  if (!direct) {
+    const assembledDirect = assembleUrlFromParts(false);
+    if (assembledDirect.url) {
+      direct = assembledDirect.url;
+      directSource = assembledDirect.source;
+    }
   }
 
   return {
@@ -177,7 +243,7 @@ export function getDatabaseConfigStatus(): {
   const neon = hasNeonConfigured();
 
   const varsPresent = Object.keys(process.env).filter(
-    (k) => /^(POSTGRES|DATABASE|DIRECT)/i.test(k) && !!process.env[k]
+    (k) => /POSTGRES|DATABASE|PGHOST|NEON/i.test(k) && !!process.env[k]
   );
 
   let host = 'unknown';
