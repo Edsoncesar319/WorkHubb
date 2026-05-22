@@ -489,3 +489,53 @@ export async function deleteExperience(id: string): Promise<boolean> {
     return false;
   }
 }
+
+/** Perfil de candidato visível para empresa que recebeu candidatura */
+export async function getCandidateProfileForCompany(
+  companyId: string,
+  candidateId: string,
+  jobId?: string
+): Promise<{
+  candidate: User;
+  experiences: Experience[];
+  applications: Array<{ application: Application; job: Job }>;
+} | null> {
+  const candidate = await getUserById(candidateId);
+  if (!candidate || candidate.type !== 'professional') return null;
+
+  const companyJobs = await getJobsByAuthor(companyId);
+  const companyJobIds = companyJobs.map((j) => j.id);
+  if (companyJobIds.length === 0) return null;
+
+  if (jobId && !companyJobIds.includes(jobId)) return null;
+
+  const rows = await withPrisma((db) =>
+    db.application.findMany({
+      where: {
+        userId: candidateId,
+        jobId: jobId ? jobId : { in: companyJobIds },
+      },
+      include: { job: true },
+      orderBy: { createdAt: 'desc' },
+    })
+  );
+
+  if (rows.length === 0) return null;
+
+  const experiences = await getUserExperiences(candidateId);
+
+  return {
+    candidate,
+    experiences,
+    applications: rows.map((row) => ({
+      application: {
+        id: row.id,
+        userId: row.userId,
+        jobId: row.jobId,
+        message: row.message,
+        createdAt: row.createdAt,
+      },
+      job: mapJob(row.job),
+    })),
+  };
+}

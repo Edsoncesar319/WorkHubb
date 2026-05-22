@@ -36,7 +36,8 @@ import {
   X,
   Plus,
   DollarSign,
-  Building2
+  Building2,
+  Eye
 } from "lucide-react"
 import Link from "next/link"
 
@@ -1082,7 +1083,17 @@ export default function ProfilePage() {
                                     </div>
                                   )}
 
-                                  <div className="flex gap-2 pt-2 border-t">
+                                  <div className="flex flex-wrap gap-2 pt-2 border-t">
+                                    {candidate && (
+                                      <Link
+                                        href={`/profile/${candidate.id}?job=${job.id}`}
+                                      >
+                                        <Button size="sm">
+                                          <Eye className="w-4 h-4 mr-2" />
+                                          Ver perfil
+                                        </Button>
+                                      </Link>
+                                    )}
                                     {candidate && (
                                       <>
                                         {candidate.github && (

@@ -94,6 +94,36 @@ export async function getJobApplications(jobId: string): Promise<Array<{ applica
 }
 
 // Funções para usuários
+export async function getUserById(id: string): Promise<User | undefined> {
+  const response = await fetch(`/api/users/${id}`)
+  if (!response.ok) {
+    if (response.status === 404) return undefined
+    throw new Error('Failed to fetch user')
+  }
+  return await response.json()
+}
+
+export type CandidateProfile = {
+  candidate: User
+  experiences: Experience[]
+  applications: Array<{ application: Application; job: Job }>
+}
+
+export async function getCandidateProfile(
+  candidateId: string,
+  companyId: string,
+  jobId?: string
+): Promise<CandidateProfile | null> {
+  const params = new URLSearchParams({ companyId })
+  if (jobId) params.set('jobId', jobId)
+  const response = await fetch(`/api/candidates/${candidateId}?${params}`)
+  if (response.status === 403 || response.status === 404) return null
+  if (!response.ok) {
+    throw new Error('Failed to fetch candidate profile')
+  }
+  return await response.json()
+}
+
 export async function getUsers(): Promise<User[]> {
   const response = await fetch('/api/users')
   if (!response.ok) {
