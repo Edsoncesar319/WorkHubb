@@ -21,6 +21,8 @@ import {
   MapPin,
   User as UserIcon,
   Award,
+  FileText,
+  Download,
 } from "lucide-react"
 
 function getInitials(name: string | undefined) {
@@ -184,6 +186,30 @@ export default function CandidateProfilePage() {
             </div>
           </div>
         </Card>
+
+        {candidate.resumeUrl && (
+          <Card className="p-6">
+            <h2 className="text-lg font-bold flex items-center gap-2 mb-4">
+              <FileText className="w-5 h-5 text-primary" />
+              Currículo
+            </h2>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <p className="text-sm text-muted-foreground truncate">
+                {candidate.resumeFileName || "curriculo.pdf"}
+              </p>
+              <a
+                href={candidate.resumeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button size="sm">
+                  <Download className="w-4 h-4 mr-2" />
+                  Baixar currículo
+                </Button>
+              </a>
+            </div>
+          </Card>
+        )}
 
         {candidate.stack && (
           <Card className="p-6">

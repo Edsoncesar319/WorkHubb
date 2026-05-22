@@ -11,6 +11,8 @@ export interface User {
   linkedin?: string
   company?: string
   profilePhoto?: string
+  resumeUrl?: string
+  resumeFileName?: string
   createdAt: string
 }
 

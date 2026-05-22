@@ -22,8 +22,10 @@ model User {
   github       String?
   linkedin     String?
   company      String?
-  profilePhoto String?  @map("profile_photo")
-  createdAt    DateTime @default(now()) @map("created_at")
+  profilePhoto   String?  @map("profile_photo")
+  resumeUrl      String?  @map("resume_url")
+  resumeFileName String?  @map("resume_file_name")
+  createdAt      DateTime @default(now()) @map("created_at")
 
   jobs         Job[]
   applications Application[]

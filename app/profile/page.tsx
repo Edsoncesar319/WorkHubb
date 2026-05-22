@@ -37,7 +37,10 @@ import {
   Plus,
   DollarSign,
   Building2,
-  Eye
+  Eye,
+  FileText,
+  Download,
+  Trash2
 } from "lucide-react"
 import Link from "next/link"
 
@@ -65,6 +68,7 @@ export default function ProfilePage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isCropperOpen, setIsCropperOpen] = useState(false)
   const [imageToCrop, setImageToCrop] = useState<string | null>(null)
+  const [resumeUploading, setResumeUploading] = useState(false)
 
   useEffect(() => {
     if (!isInitialized) return
@@ -279,6 +283,66 @@ export default function ProfilePage() {
       reader.onload = () => resolve(reader.result as string)
       reader.onerror = error => reject(error)
     })
+  }
+
+  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+
+    setResumeUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("userId", user.id)
+
+      const response = await fetch("/api/upload/resume", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || "Erro ao enviar currículo")
+      }
+
+      const data = await response.json()
+      const updated = await updateUser(user.id, {
+        resumeUrl: data.url,
+        resumeFileName: data.fileName || file.name,
+      })
+
+      if (updated) {
+        setUser(updated)
+        setCurrentUser(updated)
+      }
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Erro ao enviar currículo"
+      alert(message)
+    } finally {
+      setResumeUploading(false)
+      e.target.value = ""
+    }
+  }
+
+  const handleRemoveResume = async () => {
+    if (!user || !confirm("Remover o currículo do seu perfil?")) return
+
+    setResumeUploading(true)
+    try {
+      const updated = await updateUser(user.id, {
+        resumeUrl: null,
+        resumeFileName: null,
+      })
+      if (updated) {
+        setUser(updated)
+        setCurrentUser(updated)
+      }
+    } catch {
+      alert("Não foi possível remover o currículo.")
+    } finally {
+      setResumeUploading(false)
+    }
   }
 
   const uploadToBlob = async (file: File): Promise<string> => {
@@ -573,6 +637,106 @@ export default function ProfilePage() {
                     </Badge>
                   ))}
                 </div>
+              </Card>
+            )}
+
+            {/* Resume Section — candidato */}
+            {user.type === "professional" && (
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-primary" />
+                    <h2 className="text-xl font-bold">Currículo</h2>
+                  </div>
+                  {user.resumeUrl && (
+                    <Badge variant="secondary">Enviado</Badge>
+                  )}
+                </div>
+
+                {user.resumeUrl ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/40 border">
+                      <FileText className="w-10 h-10 text-primary shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">
+                          {user.resumeFileName || "curriculo.pdf"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          PDF, DOC ou DOCX — até 10MB
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        href={user.resumeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Button variant="outline" size="sm" disabled={resumeUploading}>
+                          <Download className="w-4 h-4 mr-2" />
+                          Baixar / visualizar
+                        </Button>
+                      </a>
+                      <input
+                        id="resume-replace"
+                        type="file"
+                        accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        className="hidden"
+                        disabled={resumeUploading}
+                        onChange={handleResumeUpload}
+                      />
+                      <label htmlFor="resume-replace">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={resumeUploading}
+                          type="button"
+                          asChild
+                        >
+                          <span>
+                            <Upload className="w-4 h-4 mr-2" />
+                            {resumeUploading ? "Enviando..." : "Substituir"}
+                          </span>
+                        </Button>
+                      </label>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={resumeUploading}
+                        onClick={handleRemoveResume}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Remover
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 border border-dashed rounded-lg">
+                    <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground mb-4">
+                      Envie seu currículo para que as empresas possam conhecer melhor seu perfil.
+                    </p>
+                    <input
+                      id="resume-upload"
+                      type="file"
+                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      className="hidden"
+                      disabled={resumeUploading}
+                      onChange={handleResumeUpload}
+                    />
+                    <label htmlFor="resume-upload">
+                      <Button disabled={resumeUploading} type="button" asChild>
+                        <span>
+                          <Upload className="w-4 h-4 mr-2" />
+                          {resumeUploading ? "Enviando..." : "Enviar currículo"}
+                        </span>
+                      </Button>
+                    </label>
+                    <p className="text-xs text-muted-foreground mt-3">
+                      PDF, DOC ou DOCX — máximo 10MB
+                    </p>
+                  </div>
+                )}
               </Card>
             )}
 
@@ -1085,14 +1249,28 @@ export default function ProfilePage() {
 
                                   <div className="flex flex-wrap gap-2 pt-2 border-t">
                                     {candidate && (
-                                      <Link
-                                        href={`/profile/${candidate.id}?job=${job.id}`}
-                                      >
-                                        <Button size="sm">
-                                          <Eye className="w-4 h-4 mr-2" />
-                                          Ver perfil
-                                        </Button>
-                                      </Link>
+                                      <>
+                                        <Link
+                                          href={`/profile/${candidate.id}?job=${job.id}`}
+                                        >
+                                          <Button size="sm">
+                                            <Eye className="w-4 h-4 mr-2" />
+                                            Ver perfil
+                                          </Button>
+                                        </Link>
+                                        {candidate.resumeUrl && (
+                                          <a
+                                            href={candidate.resumeUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                          >
+                                            <Button variant="outline" size="sm">
+                                              <FileText className="w-4 h-4 mr-2" />
+                                              Currículo
+                                            </Button>
+                                          </a>
+                                        )}
+                                      </>
                                     )}
                                     {candidate && (
                                       <>

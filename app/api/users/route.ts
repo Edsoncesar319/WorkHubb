@@ -82,6 +82,8 @@ export async function POST(request: NextRequest) {
       linkedin: body.linkedin ? String(body.linkedin).trim() : null,
       company: body.company ? String(body.company).trim() : null,
       profilePhoto: body.profilePhoto ? String(body.profilePhoto).trim() : null,
+      resumeUrl: body.resumeUrl ? String(body.resumeUrl).trim() : null,
+      resumeFileName: body.resumeFileName ? String(body.resumeFileName).trim() : null,
     };
 
     console.log('Creating user with processed data:', {

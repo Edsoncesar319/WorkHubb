@@ -26,6 +26,8 @@ function mapUser(row: {
   linkedin: string | null;
   company: string | null;
   profilePhoto: string | null;
+  resumeUrl: string | null;
+  resumeFileName: string | null;
   createdAt: Date;
 }): User {
   return {
@@ -39,6 +41,8 @@ function mapUser(row: {
     linkedin: row.linkedin,
     company: row.company,
     profilePhoto: row.profilePhoto,
+    resumeUrl: row.resumeUrl,
+    resumeFileName: row.resumeFileName,
     createdAt: row.createdAt,
   };
 }
@@ -186,6 +190,8 @@ export async function createUser(user: NewUser): Promise<User> {
         linkedin: user.linkedin ?? null,
         company: user.company ?? null,
         profilePhoto: user.profilePhoto ?? null,
+        resumeUrl: user.resumeUrl ?? null,
+        resumeFileName: user.resumeFileName ?? null,
       },
     })
     );

@@ -13,6 +13,8 @@ export interface User {
   linkedin: string | null;
   company: string | null;
   profilePhoto: string | null;
+  resumeUrl: string | null;
+  resumeFileName: string | null;
   createdAt: Date;
 }
 
@@ -27,6 +29,8 @@ export interface NewUser {
   linkedin?: string | null;
   company?: string | null;
   profilePhoto?: string | null;
+  resumeUrl?: string | null;
+  resumeFileName?: string | null;
   createdAt?: Date;
 }
 
