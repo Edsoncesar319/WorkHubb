@@ -53,6 +53,7 @@ function mapJob(row: {
   company: string;
   location: string;
   remote: boolean;
+  hybrid: boolean;
   salary: string | null;
   description: string;
   requirements: string;
@@ -71,6 +72,7 @@ function mapJob(row: {
     company: row.company,
     location: row.location,
     remote: row.remote,
+    hybrid: row.hybrid ?? false,
     salary: row.salary,
     description: row.description,
     requirements,

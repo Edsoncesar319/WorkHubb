@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "jobs" ADD COLUMN IF NOT EXISTS "hybrid" BOOLEAN NOT NULL DEFAULT false;

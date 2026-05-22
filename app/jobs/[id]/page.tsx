@@ -12,6 +12,7 @@ import { getCurrentUser } from "@/lib/auth"
 import type { Job } from "@/lib/types"
 import { MapPin, DollarSign, Building2, ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import { WorkModeBadge } from "@/components/work-mode-badge"
 
 export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
@@ -94,7 +95,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               <span>{job.location}</span>
             </div>
 
-            {job.remote && <Badge className="bg-primary/20 text-primary border-primary/30">Remoto</Badge>}
+            <WorkModeBadge job={job} />
 
             {job.salary && (
               <div className="flex items-center gap-2 text-muted-foreground">

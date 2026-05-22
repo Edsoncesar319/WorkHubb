@@ -22,6 +22,7 @@ export interface Job {
   company: string
   location: string
   remote: boolean
+  hybrid?: boolean
   salary?: string
   description: string
   requirements: string[]

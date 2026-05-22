@@ -3,6 +3,7 @@ import type { Job } from "@/lib/types"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { MapPin, DollarSign } from "lucide-react"
+import { WorkModeBadge } from "@/components/work-mode-badge"
 
 interface JobCardProps {
   job: Job
@@ -24,11 +25,7 @@ export function JobCard({ job }: JobCardProps) {
               <span>{job.location}</span>
             </div>
 
-            {job.remote && (
-              <Badge variant="secondary" className="bg-primary/20 text-primary border-primary/30">
-                Remoto
-              </Badge>
-            )}
+            <WorkModeBadge job={job} />
 
             {job.salary && (
               <div className="flex items-center gap-1">

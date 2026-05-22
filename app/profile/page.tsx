@@ -43,6 +43,8 @@ import {
   Trash2
 } from "lucide-react"
 import Link from "next/link"
+import { WorkModeBadge } from "@/components/work-mode-badge"
+import { getWorkMode, workModeLabel } from "@/lib/work-mode"
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -1027,11 +1029,9 @@ export default function ProfilePage() {
                                 <Clock className="w-3 h-3 mr-1" />
                                 {new Date(job.createdAt).toLocaleDateString("pt-BR")}
                               </Badge>
-                              {job.remote && (
-                                <Badge className="bg-primary/20 text-primary border-primary/30 mt-1">
-                                  Remoto
-                                </Badge>
-                              )}
+                              <div className="mt-1">
+                                <WorkModeBadge job={job} />
+                              </div>
                             </div>
                           </div>
 
@@ -1124,11 +1124,7 @@ export default function ProfilePage() {
                                 <MapPin className="w-4 h-4" />
                                 <span>{job.location}</span>
                               </div>
-                              {job.remote && (
-                                <Badge className="bg-primary/20 text-primary border-primary/30">
-                                  Remoto
-                                </Badge>
-                              )}
+                              <WorkModeBadge job={job} />
                               {job.salary && (
                                 <div className="flex items-center gap-2 text-muted-foreground">
                                   <DollarSign className="w-4 h-4" />

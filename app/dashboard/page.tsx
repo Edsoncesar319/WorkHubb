@@ -14,6 +14,12 @@ import { getCurrentUser } from "@/lib/auth"
 import { getJobs, addJob } from "@/lib/data"
 import type { User, Job } from "@/lib/types"
 import { Plus, Briefcase } from "lucide-react"
+import {
+  workModeLabel,
+  workModeToFields,
+  type WorkMode,
+} from "@/lib/work-mode"
+import { WorkModeBadge } from "@/components/work-mode-badge"
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -23,7 +29,7 @@ export default function DashboardPage() {
   const [formData, setFormData] = useState({
     title: "",
     location: "",
-    remote: false,
+    workMode: "onsite" as WorkMode,
     salary: "",
     description: "",
     requirements: "",
@@ -75,7 +81,7 @@ export default function DashboardPage() {
     setFormData({
       title: "",
       location: "",
-      remote: false,
+      workMode: "onsite",
       salary: "",
       description: "",
       requirements: "",
@@ -139,17 +145,21 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="remote"
-                  checked={formData.remote}
-                  onChange={(e) => setFormData({ ...formData, remote: e.target.checked })}
-                  className="w-4 h-4"
-                />
-                <Label htmlFor="remote" className="cursor-pointer">
-                  Trabalho Remoto
-                </Label>
+              <div className="space-y-2">
+                <Label>Modalidade de trabalho *</Label>
+                <div className="flex flex-wrap gap-2">
+                  {(["onsite", "remote", "hybrid"] as WorkMode[]).map((mode) => (
+                    <Button
+                      key={mode}
+                      type="button"
+                      variant={formData.workMode === mode ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setFormData({ ...formData, workMode: mode })}
+                    >
+                      {workModeLabel(mode)}
+                    </Button>
+                  ))}
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -208,7 +218,7 @@ export default function DashboardPage() {
                       <p className="text-muted-foreground">{job.location}</p>
                     </div>
                     <div className="flex gap-2">
-                      {job.remote && <Badge className="bg-primary/20 text-primary border-primary/30">Remoto</Badge>}
+                      <WorkModeBadge job={job} />
                       <Badge variant="secondary">{new Date(job.createdAt).toLocaleDateString("pt-BR")}</Badge>
                     </div>
                   </div>

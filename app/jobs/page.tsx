@@ -7,11 +7,23 @@ import { Button } from "@/components/ui/button"
 import { getJobs } from "@/lib/data"
 import type { Job } from "@/lib/types"
 import { Search } from "lucide-react"
+import {
+  jobMatchesWorkModeFilter,
+  workModeLabel,
+  type WorkModeFilter,
+} from "@/lib/work-mode"
+
+const WORK_MODE_FILTERS: WorkModeFilter[] = [
+  "all",
+  "remote",
+  "hybrid",
+  "onsite",
+]
 
 export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [searchTerm, setSearchTerm] = useState("")
-  const [remoteFilter, setRemoteFilter] = useState<boolean | null>(null)
+  const [workModeFilter, setWorkModeFilter] = useState<WorkModeFilter>("all")
 
   useEffect(() => {
     const loadJobs = async () => {
@@ -27,9 +39,9 @@ export default function JobsPage() {
       job.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
       job.description.toLowerCase().includes(searchTerm.toLowerCase())
 
-    const matchesRemote = remoteFilter === null || job.remote === remoteFilter
+    const matchesWorkMode = jobMatchesWorkModeFilter(job, workModeFilter)
 
-    return matchesSearch && matchesRemote
+    return matchesSearch && matchesWorkMode
   })
 
   return (
@@ -51,28 +63,17 @@ export default function JobsPage() {
           />
         </div>
 
-        <div className="flex gap-2">
-          <Button
-            variant={remoteFilter === null ? "default" : "outline"}
-            onClick={() => setRemoteFilter(null)}
-            size="sm"
-          >
-            Todas
-          </Button>
-          <Button
-            variant={remoteFilter === true ? "default" : "outline"}
-            onClick={() => setRemoteFilter(true)}
-            size="sm"
-          >
-            Remoto
-          </Button>
-          <Button
-            variant={remoteFilter === false ? "default" : "outline"}
-            onClick={() => setRemoteFilter(false)}
-            size="sm"
-          >
-            Presencial
-          </Button>
+        <div className="flex flex-wrap gap-2">
+          {WORK_MODE_FILTERS.map((mode) => (
+            <Button
+              key={mode}
+              variant={workModeFilter === mode ? "default" : "outline"}
+              onClick={() => setWorkModeFilter(mode)}
+              size="sm"
+            >
+              {mode === "all" ? "Todas" : workModeLabel(mode)}
+            </Button>
+          ))}
         </div>
       </div>
 

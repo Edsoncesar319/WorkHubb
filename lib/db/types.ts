@@ -40,6 +40,7 @@ export interface Job {
   company: string;
   location: string;
   remote: boolean;
+  hybrid: boolean;
   salary: string | null;
   description: string;
   requirements: string[];
@@ -53,6 +54,7 @@ export interface NewJob {
   company: string;
   location: string;
   remote: boolean;
+  hybrid?: boolean;
   salary?: string | null;
   description: string;
   requirements: string[];
