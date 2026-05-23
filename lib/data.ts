@@ -79,8 +79,11 @@ export async function addApplication(application: Omit<Application, "id" | "crea
 }
 
 export async function getUserApplications(userId: string): Promise<Application[]> {
-  const applications = await getApplications()
-  return applications.filter(app => app.userId === userId)
+  const response = await fetch(`/api/applications/user/${encodeURIComponent(userId)}`)
+  if (!response.ok) {
+    throw new Error('Failed to fetch user applications')
+  }
+  return await response.json()
 }
 
 export async function hasApplied(userId: string, jobId: string): Promise<boolean> {

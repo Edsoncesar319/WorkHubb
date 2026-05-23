@@ -13,6 +13,13 @@ import { ChatMessageButton } from "@/components/chat-message-button"
 import { getCandidateProfile, type CandidateProfile } from "@/lib/data"
 import { useDatabaseSync } from "@/hooks/use-database-sync"
 import {
+  compareInstants,
+  compareMonthStrings,
+  formatExperienceDuration,
+  formatExperiencePeriod,
+  formatRelativeDateTime,
+} from "@/lib/format-date"
+import {
   ArrowLeft,
   Briefcase,
   Calendar,
@@ -33,10 +40,6 @@ function getInitials(name: string | undefined) {
     .map((n) => n[0])
     .join("")
     .toUpperCase()
-}
-
-function formatDate(value: string | Date) {
-  return new Date(value).toLocaleDateString("pt-BR")
 }
 
 export default function CandidateProfilePage() {
@@ -73,7 +76,15 @@ export default function CandidateProfilePage() {
         if (!data) {
           setDenied(true)
         } else {
-          setProfile(data)
+          setProfile({
+            ...data,
+            experiences: [...data.experiences].sort((a, b) =>
+              compareMonthStrings(a.startDate, b.startDate)
+            ),
+            applications: [...data.applications].sort((a, b) =>
+              compareInstants(a.application.createdAt, b.application.createdAt)
+            ),
+          })
         }
       })
       .catch(() => setDenied(true))
@@ -252,7 +263,7 @@ export default function CandidateProfilePage() {
                 </Link>
                 <Badge variant="outline">
                   <Calendar className="w-3 h-3 mr-1" />
-                  {formatDate(highlightedApplication.application.createdAt)}
+                  {formatRelativeDateTime(highlightedApplication.application.createdAt)}
                 </Badge>
               </div>
               {highlightedApplication.application.message && (
@@ -279,7 +290,7 @@ export default function CandidateProfilePage() {
                       {job.title}
                     </Link>
                     <span className="text-muted-foreground">
-                      {formatDate(application.createdAt)}
+                      {formatRelativeDateTime(application.createdAt)}
                     </span>
                   </li>
                 ))}
@@ -313,9 +324,13 @@ export default function CandidateProfilePage() {
                       )}
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
-                        {exp.startDate}
-                        {" — "}
-                        {exp.current ? "Atual" : exp.endDate || "—"}
+                        {formatExperiencePeriod(exp.startDate, exp.endDate, exp.current)}
+                        {formatExperienceDuration(exp.startDate, exp.endDate, exp.current) && (
+                          <>
+                            {" · "}
+                            {formatExperienceDuration(exp.startDate, exp.endDate, exp.current)}
+                          </>
+                        )}
                       </span>
                     </div>
                     {exp.description && (

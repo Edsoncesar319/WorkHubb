@@ -15,7 +15,7 @@ export interface User {
   profilePhoto: string | null;
   resumeUrl: string | null;
   resumeFileName: string | null;
-  createdAt: Date;
+  createdAt: string;
 }
 
 export interface NewUser {
@@ -45,7 +45,7 @@ export interface Job {
   description: string;
   requirements: string[];
   authorId: string;
-  createdAt: Date;
+  createdAt: string;
 }
 
 export interface NewJob {
@@ -67,7 +67,7 @@ export interface Application {
   userId: string;
   jobId: string;
   message: string;
-  createdAt: Date;
+  createdAt: string;
 }
 
 export interface NewApplication {
@@ -88,7 +88,7 @@ export interface Experience {
   endDate: string | null;
   current: boolean;
   description: string | null;
-  createdAt: Date;
+  createdAt: string;
 }
 
 export interface NewExperience {

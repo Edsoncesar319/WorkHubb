@@ -13,7 +13,17 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { getCurrentUser, setCurrentUser } from "@/lib/auth"
-import { getUserApplications, getJobById, updateUser, addUser, getJobsByAuthor, getJobApplications, getUserExperiences, addExperience, updateExperience, deleteExperience } from "@/lib/data"
+import { getUserApplications, getJobById, updateUser, addUser, getJobsByAuthor, getJobApplications, getUserExperiences, addExperience, updateExperience, deleteExperience, getUserById } from "@/lib/data"
+import {
+  compareInstants,
+  compareMonthStrings,
+  formatDateLong,
+  formatExperienceDuration,
+  formatExperiencePeriod,
+  formatRelativeDateTime,
+  isWithinLastDays,
+  normalizeMonthInput,
+} from "@/lib/format-date"
 import { useDatabaseSync } from "@/hooks/use-database-sync"
 import { ImageCropper } from "@/components/image-cropper"
 import type { User, Application, Job, Experience } from "@/lib/types"
@@ -83,37 +93,54 @@ export default function ProfilePage() {
       return
     }
 
-    setUser(currentUser)
+    let userToUse = currentUser
+    try {
+      const freshUser = await getUserById(currentUser.id)
+      if (freshUser) {
+        userToUse = freshUser
+        setCurrentUser(freshUser)
+      }
+    } catch {
+      /* mantém usuário do storage */
+    }
+
+    setUser(userToUse)
       setEditForm({
-        name: currentUser.name || "",
-        bio: currentUser.bio || "",
-        stack: currentUser.stack || "",
-        github: currentUser.github || "",
-        linkedin: currentUser.linkedin || "",
-        profilePhoto: currentUser.profilePhoto || ""
+        name: userToUse.name || "",
+        bio: userToUse.bio || "",
+        stack: userToUse.stack || "",
+        github: userToUse.github || "",
+        linkedin: userToUse.linkedin || "",
+        profilePhoto: userToUse.profilePhoto || ""
       })
 
-    if (currentUser.type === "professional") {
+    if (userToUse.type === "professional") {
         try {
-          const userApps = await getUserApplications(currentUser.id)
-          const appsWithJobs = await Promise.all(
-            userApps.map(async (app) => ({
-        ...app,
-              job: await getJobById(app.jobId),
-      }))
-          )
+          const userApps = await getUserApplications(userToUse.id)
+          const appsWithJobs = (
+            await Promise.all(
+              userApps.map(async (app) => ({
+                ...app,
+                job: await getJobById(app.jobId),
+              }))
+            )
+          ).sort((a, b) => compareInstants(a.createdAt, b.createdAt))
       setApplications(appsWithJobs)
           
-          // Carregar experiências profissionais
-          const userExperiences = await getUserExperiences(currentUser.id)
-          setExperiences(userExperiences)
+          const userExperiences = await getUserExperiences(userToUse.id)
+          setExperiences(
+            [...userExperiences].sort((a, b) =>
+              compareMonthStrings(a.startDate, b.startDate)
+            )
+          )
         } catch (error) {
           console.error('Error loading applications:', error)
         }
-      } else if (currentUser.type === "company") {
+      } else if (userToUse.type === "company") {
         try {
-          // Carregar vagas da empresa
-          const jobs = await getJobsByAuthor(currentUser.id)
+          const jobs = (await getJobsByAuthor(userToUse.id)).sort((a, b) =>
+            compareInstants(a.createdAt, b.createdAt)
+          )
           setCompanyJobs(jobs)
           
           // Carregar candidaturas para cada vaga
@@ -448,6 +475,20 @@ export default function ProfilePage() {
   const handleSaveExperience = async () => {
     if (!user) return
 
+    const startMonth = normalizeMonthInput(experienceForm.startDate)
+    if (!startMonth) {
+      alert("Informe a data de início no formato mês/ano.")
+      return
+    }
+    const endMonth =
+      !experienceForm.current && experienceForm.endDate
+        ? normalizeMonthInput(experienceForm.endDate)
+        : null
+    if (!experienceForm.current && experienceForm.endDate && !endMonth) {
+      alert("Data de término inválida. Use o seletor de mês/ano.")
+      return
+    }
+
     setIsLoading(true)
     try {
       if (editingExperience) {
@@ -456,13 +497,17 @@ export default function ProfilePage() {
           title: experienceForm.title,
           company: experienceForm.company,
           location: experienceForm.location || undefined,
-          startDate: experienceForm.startDate,
-          endDate: experienceForm.current ? undefined : (experienceForm.endDate || undefined),
+          startDate: startMonth,
+          endDate: experienceForm.current ? undefined : endMonth || undefined,
           current: experienceForm.current,
           description: experienceForm.description || undefined
         })
         if (updated) {
-          setExperiences(experiences.map(e => e.id === updated.id ? updated : e))
+          setExperiences(
+            experiences
+              .map((e) => (e.id === updated.id ? updated : e))
+              .sort((a, b) => compareMonthStrings(a.startDate, b.startDate))
+          )
           setIsExperienceModalOpen(false)
         }
       } else {
@@ -472,12 +517,16 @@ export default function ProfilePage() {
           title: experienceForm.title,
           company: experienceForm.company,
           location: experienceForm.location || undefined,
-          startDate: experienceForm.startDate,
-          endDate: experienceForm.current ? undefined : (experienceForm.endDate || undefined),
+          startDate: startMonth,
+          endDate: experienceForm.current ? undefined : endMonth || undefined,
           current: experienceForm.current,
           description: experienceForm.description || undefined
         })
-        setExperiences([...experiences, newExp])
+        setExperiences(
+          [...experiences, newExp].sort((a, b) =>
+            compareMonthStrings(a.startDate, b.startDate)
+          )
+        )
         setIsExperienceModalOpen(false)
       }
     } catch (error) {
@@ -513,12 +562,9 @@ export default function ProfilePage() {
 
   // Calculate profile statistics
   const totalApplications = applications.length
-  const recentApplications = applications.filter(app => {
-    const appDate = new Date(app.createdAt)
-    const thirtyDaysAgo = new Date()
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-    return appDate >= thirtyDaysAgo
-  }).length
+  const recentApplications = applications.filter((app) =>
+    isWithinLastDays(app.createdAt, 30)
+  ).length
 
   const getInitials = (name: string | undefined) => {
     if (!name || typeof name !== 'string') {
@@ -552,7 +598,7 @@ export default function ProfilePage() {
               </Badge>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Calendar className="w-4 h-4" />
-                  <span>Membro desde {user.createdAt ? new Date(user.createdAt).toLocaleDateString("pt-BR") : "N/A"}</span>
+                  <span>Membro desde {formatDateLong(user.createdAt)}</span>
                 </div>
               </div>
             </div>
@@ -789,9 +835,13 @@ export default function ProfilePage() {
                             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                               <Calendar className="w-4 h-4" />
                               <span>
-                                {new Date(exp.startDate).toLocaleDateString("pt-BR", { month: "short", year: "numeric" })} - {
-                                  exp.current ? "Atual" : exp.endDate ? new Date(exp.endDate).toLocaleDateString("pt-BR", { month: "short", year: "numeric" }) : "N/A"
-                                }
+                                {formatExperiencePeriod(exp.startDate, exp.endDate, exp.current)}
+                                {formatExperienceDuration(exp.startDate, exp.endDate, exp.current) && (
+                                  <span className="text-muted-foreground">
+                                    {" · "}
+                                    {formatExperienceDuration(exp.startDate, exp.endDate, exp.current)}
+                                  </span>
+                                )}
                               </span>
                             </div>
                             {exp.description && (
@@ -942,7 +992,7 @@ export default function ProfilePage() {
                           <div className="text-right">
                             <Badge variant="secondary" className="mb-1">
                               <Clock className="w-3 h-3 mr-1" />
-                              {new Date(app.createdAt).toLocaleDateString("pt-BR")}
+                              {formatRelativeDateTime(app.createdAt)}
                             </Badge>
                             <div className="text-xs text-muted-foreground">
                               {app.job.remote ? "Remoto" : app.job.location}
@@ -1033,7 +1083,7 @@ export default function ProfilePage() {
                             <div className="text-right ml-4">
                               <Badge variant="secondary" className="mb-1">
                                 <Clock className="w-3 h-3 mr-1" />
-                                {new Date(job.createdAt).toLocaleDateString("pt-BR")}
+                                {formatDateLong(job.createdAt)}
                               </Badge>
                               <div className="mt-1">
                                 <WorkModeBadge job={job} />
@@ -1211,7 +1261,7 @@ export default function ProfilePage() {
                                     <div className="text-right">
                                       <Badge variant="secondary" className="mb-1">
                                         <Clock className="w-3 h-3 mr-1" />
-                                        {new Date(application.createdAt).toLocaleDateString("pt-BR")}
+                                        {formatRelativeDateTime(application.createdAt)}
                                       </Badge>
                                     </div>
                                   </div>

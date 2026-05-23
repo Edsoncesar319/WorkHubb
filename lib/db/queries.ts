@@ -1,7 +1,12 @@
+import { compareMonthStrings } from '@/lib/format-date';
 import { withPrisma } from './prisma';
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
+}
+
+function serializeDate(value: Date): string {
+  return value.toISOString();
 }
 import { formatPrismaError } from './prisma-errors';
 import type {
@@ -43,7 +48,7 @@ function mapUser(row: {
     profilePhoto: row.profilePhoto,
     resumeUrl: row.resumeUrl,
     resumeFileName: row.resumeFileName,
-    createdAt: row.createdAt,
+    createdAt: serializeDate(row.createdAt),
   };
 }
 
@@ -77,7 +82,7 @@ function mapJob(row: {
     description: row.description,
     requirements,
     authorId: row.authorId,
-    createdAt: row.createdAt,
+    createdAt: serializeDate(row.createdAt),
   };
 }
 
@@ -103,7 +108,23 @@ function mapExperience(row: {
     endDate: row.endDate,
     current: row.current,
     description: row.description,
-    createdAt: row.createdAt,
+    createdAt: serializeDate(row.createdAt),
+  };
+}
+
+function mapApplication(row: {
+  id: string;
+  userId: string;
+  jobId: string;
+  message: string;
+  createdAt: Date;
+}): Application {
+  return {
+    id: row.id,
+    userId: row.userId,
+    jobId: row.jobId,
+    message: row.message,
+    createdAt: serializeDate(row.createdAt),
   };
 }
 
@@ -353,12 +374,13 @@ export async function getUserApplications(
   userId: string
 ): Promise<Application[]> {
   try {
-    return await withPrisma((db) =>
+    const rows = await withPrisma((db) =>
       db.application.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
       })
     );
+    return rows.map(mapApplication);
   } catch (e) {
     handleDbError(e, 'getUserApplications');
   }
@@ -387,13 +409,7 @@ export async function getJobApplicationsWithUsers(jobId: string) {
     })
     );
     return rows.map((row) => ({
-      application: {
-        id: row.id,
-        userId: row.userId,
-        jobId: row.jobId,
-        message: row.message,
-        createdAt: row.createdAt,
-      },
+      application: mapApplication(row),
       user: row.user ? mapUser(row.user) : null,
     }));
   } catch (e) {
@@ -405,7 +421,10 @@ export async function createApplication(
   application: NewApplication
 ): Promise<Application> {
   try {
-    return await withPrisma((db) => db.application.create({ data: application }));
+    const row = await withPrisma((db) =>
+      db.application.create({ data: application })
+    );
+    return mapApplication(row);
   } catch (e) {
     handleDbError(e, 'createApplication');
   }
@@ -433,13 +452,7 @@ export async function getApplicationsWithDetails() {
     })
     );
     return rows.map((row) => ({
-      application: {
-        id: row.id,
-        userId: row.userId,
-        jobId: row.jobId,
-        message: row.message,
-        createdAt: row.createdAt,
-      },
+      application: mapApplication(row),
       user: row.user ? mapUser(row.user) : null,
       job: row.job ? mapJob(row.job) : null,
     }));
@@ -559,19 +572,15 @@ export async function getCandidateProfileForCompany(
 
   if (rows.length === 0) return null;
 
-  const experiences = await getUserExperiences(candidateId);
+  const experiences = (await getUserExperiences(candidateId)).sort((a, b) =>
+    compareMonthStrings(a.startDate, b.startDate)
+  );
 
   return {
     candidate,
     experiences,
     applications: rows.map((row) => ({
-      application: {
-        id: row.id,
-        userId: row.userId,
-        jobId: row.jobId,
-        message: row.message,
-        createdAt: row.createdAt,
-      },
+      application: mapApplication(row),
       job: mapJob(row.job),
     })),
   };
