@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import NavbarWrapper from "@/components/navbar-wrapper"
+import AnimatedFaviconWrapper from "@/components/animated-favicon-wrapper"
 import { Footer } from "@/components/footer"
 
 const inter = Inter({
@@ -13,6 +14,13 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "WorkHubb - Conectando Talentos Tech",
   description: "A plataforma que conecta talentos tech com as melhores oportunidades do mercado",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
+    ],
+    apple: "/apple-icon.png",
+  },
 }
 
 export default function RootLayout({
@@ -23,6 +31,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={inter.variable}>
       <body className="antialiased">
+        <AnimatedFaviconWrapper />
         <NavbarWrapper />
         <main className="min-h-screen">{children}</main>
         <Footer />

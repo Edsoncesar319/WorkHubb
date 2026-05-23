@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="WorkHubb">
+  <defs>
+    <linearGradient id="wGrad" x1="16" y1="26" x2="16" y2="8" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1d4ed8"/>
+      <stop offset="55%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#67e8f9"/>
+    </linearGradient>
+    <radialGradient id="nodeGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#e0f2fe"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </radialGradient>
+    <filter id="softGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="0.8" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="32" height="32" rx="6" fill="#0a0a0a"/>
+
+  <!-- Rede (linhas) -->
+  <g stroke="#38bdf8" stroke-width="1.1" stroke-linecap="round" fill="none" opacity="0.85">
+    <line x1="10" y1="10.5" x2="16" y2="6.5">
+      <animate attributeName="opacity" values="0.35;1;0.35" dur="2.2s" repeatCount="indefinite"/>
+    </line>
+    <line x1="16" y1="6.5" x2="22" y2="10.5">
+      <animate attributeName="opacity" values="0.35;1;0.35" dur="2.2s" begin="0.35s" repeatCount="indefinite"/>
+    </line>
+    <line x1="22" y1="10.5" x2="10" y2="10.5">
+      <animate attributeName="opacity" values="0.35;1;0.35" dur="2.2s" begin="0.7s" repeatCount="indefinite"/>
+    </line>
+  </g>
+
+  <!-- Nós -->
+  <g filter="url(#softGlow)">
+    <circle cx="10" cy="10.5" r="2.1" fill="url(#nodeGlow)">
+      <animate attributeName="r" values="1.8;2.35;1.8" dur="1.8s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.65;1;0.65" dur="1.8s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="16" cy="6.5" r="2.1" fill="url(#nodeGlow)">
+      <animate attributeName="r" values="1.8;2.35;1.8" dur="1.8s" begin="0.3s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.65;1;0.65" dur="1.8s" begin="0.3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="22" cy="10.5" r="2.1" fill="url(#nodeGlow)">
+      <animate attributeName="r" values="1.8;2.35;1.8" dur="1.8s" begin="0.6s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.65;1;0.65" dur="1.8s" begin="0.6s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- W -->
+  <path
+    d="M5.5 23.5 L10.2 11.2 L16 19.2 L21.8 11.2 L26.5 23.5"
+    fill="none"
+    stroke="url(#wGrad)"
+    stroke-width="2.8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    filter="url(#softGlow)"
+  >
+    <animate attributeName="stroke-width" values="2.6;3.1;2.6" dur="3s" repeatCount="indefinite"/>
+  </path>
+
+  <!-- Pulso de conexão -->
+  <circle r="1" fill="#bae6fd" opacity="0">
+    <animateMotion dur="2.4s" repeatCount="indefinite" path="M10,10.5 L16,6.5 L22,10.5 L10,10.5"/>
+    <animate attributeName="opacity" values="0;1;1;0" dur="2.4s" repeatCount="indefinite"/>
+  </circle>
+</svg>
