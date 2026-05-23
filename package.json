@@ -23,7 +23,8 @@
     "vercel:env:push-db": "tsx scripts/push-vercel-db-env.ts",
     "db:check": "tsx scripts/check-env.ts",
     "db:validate": "tsx scripts/validate-prisma-env.ts",
-    "blob:check": "tsx scripts/check-blob-env.ts"
+    "blob:check": "tsx scripts/check-blob-env.ts",
+    "favicon:generate": "tsx scripts/generate-favicon.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
