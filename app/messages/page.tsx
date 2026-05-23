@@ -22,7 +22,8 @@ import {
   type ConversationDetail,
   type ConversationSummary,
 } from "@/lib/chat"
-import { Briefcase, MessageCircle, Send } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { ArrowLeft, Briefcase, MessageCircle, Send } from "lucide-react"
 
 function getInitials(name: string) {
   return name
@@ -72,11 +73,19 @@ export default function MessagesPage() {
   const [error, setError] = useState<string | null>(null)
   const [mobileShowThread, setMobileShowThread] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesScrollRef = useRef<HTMLDivElement>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const deepLinkHandled = useRef(false)
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  const mobileChatFocus = mobileShowThread && !!activeConversation
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    const el = messagesScrollRef.current
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior })
+      return
+    }
+    messagesEndRef.current?.scrollIntoView({ behavior })
   }, [])
 
   const loadConversations = useCallback(async (userId: string) => {
@@ -113,7 +122,8 @@ export default function MessagesPage() {
       setMessages(msgs)
       await markConversationRead(conversationId, userId)
       await loadConversations(userId)
-      scrollToBottom()
+
+      requestAnimationFrame(() => scrollToBottom("auto"))
 
       router.replace(`/messages?c=${conversationId}`, { scroll: false })
     },
@@ -151,24 +161,24 @@ export default function MessagesPage() {
         if (!deepLinkHandled.current) {
           deepLinkHandled.current = true
 
-        if (paramWithUserId && paramWithUserId !== current.id) {
-          await startConversationWith(current, paramWithUserId, paramJobId ?? undefined)
-        } else if (paramConversationId) {
-          const found = list.find((c) => c.id === paramConversationId)
-          if (found) {
-            await openConversation(current.id, paramConversationId, {
-              id: found.id,
-              jobId: found.jobId,
-              jobTitle: found.jobTitle,
-              participant1Id: "",
-              participant2Id: "",
-              otherUser: found.otherUser,
-            })
-          } else {
-            const conv = await getConversation(paramConversationId, current.id)
-            await openConversation(current.id, paramConversationId, conv)
+          if (paramWithUserId && paramWithUserId !== current.id) {
+            await startConversationWith(current, paramWithUserId, paramJobId ?? undefined)
+          } else if (paramConversationId) {
+            const found = list.find((c) => c.id === paramConversationId)
+            if (found) {
+              await openConversation(current.id, paramConversationId, {
+                id: found.id,
+                jobId: found.jobId,
+                jobTitle: found.jobTitle,
+                participant1Id: "",
+                participant2Id: "",
+                otherUser: found.otherUser,
+              })
+            } else {
+              const conv = await getConversation(paramConversationId, current.id)
+              await openConversation(current.id, paramConversationId, conv)
+            }
           }
-        }
         }
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : "Erro ao carregar mensagens"
@@ -203,8 +213,17 @@ export default function MessagesPage() {
   }, [user, activeConversation, loadConversations])
 
   useEffect(() => {
-    scrollToBottom()
+    scrollToBottom(messages.length <= 1 ? "auto" : "smooth")
   }, [messages, scrollToBottom])
+
+  useEffect(() => {
+    if (!mobileChatFocus) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [mobileChatFocus])
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -241,39 +260,106 @@ export default function MessagesPage() {
     })
   }
 
+  const messageBubbles = (
+    <div className="mx-auto w-full max-w-md space-y-3">
+      {messages.length === 0 ? (
+        <p className="text-center text-sm text-muted-foreground py-8">
+          Envie a primeira mensagem
+        </p>
+      ) : (
+        messages.map((msg) => {
+          const isMine = msg.senderId === user!.id
+          return (
+            <div
+              key={msg.id}
+              className={cn("flex w-full", isMine ? "justify-end" : "justify-start")}
+            >
+              <div
+                className={cn(
+                  "max-w-[88%] rounded-2xl px-4 py-2 text-sm shadow-sm",
+                  isMine
+                    ? "bg-primary text-primary-foreground rounded-br-md"
+                    : "bg-muted rounded-bl-md"
+                )}
+              >
+                <p className="whitespace-pre-wrap break-words text-left">{msg.content}</p>
+                <p
+                  className={cn(
+                    "text-[10px] mt-1 text-right",
+                    isMine ? "text-primary-foreground/70" : "text-muted-foreground"
+                  )}
+                >
+                  {formatTime(msg.createdAt)}
+                </p>
+              </div>
+            </div>
+          )
+        })
+      )}
+      <div ref={messagesEndRef} aria-hidden />
+    </div>
+  )
+
   if (!user) {
     return null
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <MessageCircle className="w-8 h-8 text-primary" />
+    <div
+      className={cn(
+        "mx-auto max-w-6xl",
+        mobileChatFocus
+          ? "fixed inset-x-0 top-16 bottom-0 z-40 flex flex-col bg-background md:static md:inset-auto md:z-auto md:container md:px-4 md:py-8"
+          : "container px-4 py-6 md:py-8 min-h-[calc(100dvh-4rem)] md:min-h-0"
+      )}
+    >
+      <div
+        className={cn(
+          "mb-6 shrink-0",
+          mobileChatFocus && "hidden md:block"
+        )}
+      >
+        <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
+          <MessageCircle className="w-7 h-7 md:w-8 md:h-8 text-primary" />
           Mensagens
         </h1>
-        <p className="text-muted-foreground mt-1">
+        <p className="text-muted-foreground mt-1 text-sm md:text-base">
           Converse com empresas e profissionais sobre vagas e candidaturas
         </p>
       </div>
 
       {error && (
-        <Card className="p-4 mb-4 border-destructive/50 bg-destructive/10">
+        <Card
+          className={cn(
+            "p-3 mb-3 border-destructive/50 bg-destructive/10 shrink-0",
+            mobileChatFocus && "mx-3 md:mx-0 rounded-lg"
+          )}
+        >
           <p className="text-sm text-destructive">{error}</p>
         </Card>
       )}
 
-      <Card className="overflow-hidden min-h-[560px] flex flex-col md:flex-row border-border">
+      <Card
+        className={cn(
+          "overflow-hidden flex flex-col border-border",
+          mobileChatFocus
+            ? "flex-1 min-h-0 rounded-none border-0 shadow-none md:min-h-[560px] md:rounded-xl md:border md:flex-row md:shadow-sm"
+            : "min-h-[calc(100dvh-11rem)] md:min-h-[560px] md:flex-row"
+        )}
+      >
         {/* Lista de conversas */}
         <div
-          className={`md:w-80 lg:w-96 border-b md:border-b-0 md:border-r border-border flex flex-col ${
-            mobileShowThread ? "hidden md:flex" : "flex"
-          }`}
+          className={cn(
+            "border-border flex flex-col shrink-0",
+            "md:w-80 lg:w-96 md:border-r",
+            mobileChatFocus ? "hidden md:flex" : "flex flex-1 md:flex-none md:max-h-none",
+            !mobileChatFocus && "border-b md:border-b-0"
+          )}
         >
           <div className="p-4 border-b border-border font-semibold text-sm text-muted-foreground">
             Conversas ({conversations.length})
           </div>
-          <ScrollArea className="flex-1 max-h-[480px] md:max-h-none">
+          <ScrollArea className="flex-1 md:max-h-none">
             {loading && conversations.length === 0 ? (
               <p className="p-6 text-sm text-muted-foreground text-center">Carregando...</p>
             ) : conversations.length === 0 ? (
@@ -293,9 +379,10 @@ export default function MessagesPage() {
                       <button
                         type="button"
                         onClick={() => selectConversation(conv)}
-                        className={`w-full text-left p-4 flex gap-3 hover:bg-muted/40 transition-colors border-b border-border/50 ${
-                          isActive ? "bg-primary/10" : ""
-                        }`}
+                        className={cn(
+                          "w-full text-left p-4 flex gap-3 hover:bg-muted/40 transition-colors border-b border-border/50",
+                          isActive && "bg-primary/10"
+                        )}
                       >
                         <Avatar className="h-10 w-10 shrink-0">
                           <AvatarImage src={conv.otherUser.profilePhoto || undefined} />
@@ -334,24 +421,35 @@ export default function MessagesPage() {
           </ScrollArea>
         </div>
 
-        {/* Thread */}
+        {/* Thread — foco no mobile */}
         <div
-          className={`flex-1 flex flex-col min-h-[400px] ${
-            !mobileShowThread && conversations.length > 0 ? "hidden md:flex" : "flex"
-          }`}
+          className={cn(
+            "flex flex-col min-h-0 bg-background",
+            mobileChatFocus
+              ? "flex-1 w-full"
+              : cn(
+                  "flex-1",
+                  !mobileShowThread && conversations.length > 0 && "hidden md:flex",
+                  (!conversations.length || mobileShowThread) && "flex"
+                )
+          )}
         >
           {activeConversation ? (
             <>
-              <div className="p-4 border-b border-border flex items-center gap-3">
+              <div className="shrink-0 p-3 md:p-4 border-b border-border flex items-center gap-2 md:gap-3 bg-card/80 backdrop-blur-sm">
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="md:hidden -ml-2"
-                  onClick={() => setMobileShowThread(false)}
+                  size="icon"
+                  className="md:hidden shrink-0"
+                  aria-label="Voltar para conversas"
+                  onClick={() => {
+                    setMobileShowThread(false)
+                    router.replace("/messages", { scroll: false })
+                  }}
                 >
-                  Voltar
+                  <ArrowLeft className="h-5 w-5" />
                 </Button>
-                <Avatar className="h-10 w-10">
+                <Avatar className="h-10 w-10 shrink-0">
                   <AvatarImage
                     src={activeConversation.otherUser.profilePhoto || undefined}
                   />
@@ -359,13 +457,13 @@ export default function MessagesPage() {
                     {getInitials(activeConversation.otherUser.name)}
                   </AvatarFallback>
                 </Avatar>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1 text-center md:text-left">
                   <p className="font-semibold truncate">
                     {otherUserLabel(activeConversation.otherUser)}
                   </p>
                   {activeConversation.jobTitle && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Briefcase className="w-3 h-3" />
+                    <p className="text-xs text-muted-foreground flex items-center justify-center md:justify-start gap-1 truncate">
+                      <Briefcase className="w-3 h-3 shrink-0" />
                       {activeConversation.jobTitle}
                     </p>
                   )}
@@ -373,71 +471,53 @@ export default function MessagesPage() {
                 {activeConversation.otherUser.type === "professional" && (
                   <Link
                     href={`/profile/${activeConversation.otherUser.id}`}
-                    className="ml-auto text-xs text-primary hover:underline shrink-0"
+                    className="text-xs text-primary hover:underline shrink-0 hidden sm:inline"
                   >
-                    Ver perfil
+                    Perfil
                   </Link>
                 )}
               </div>
 
-              <ScrollArea className="flex-1 p-4">
-                <div className="space-y-3 min-h-[280px]">
-                  {messages.length === 0 ? (
-                    <p className="text-center text-sm text-muted-foreground py-12">
-                      Envie a primeira mensagem
-                    </p>
-                  ) : (
-                    messages.map((msg) => {
-                      const isMine = msg.senderId === user.id
-                      return (
-                        <div
-                          key={msg.id}
-                          className={`flex ${isMine ? "justify-end" : "justify-start"}`}
-                        >
-                          <div
-                            className={`max-w-[85%] md:max-w-[70%] rounded-2xl px-4 py-2 text-sm ${
-                              isMine
-                                ? "bg-primary text-primary-foreground rounded-br-md"
-                                : "bg-muted rounded-bl-md"
-                            }`}
-                          >
-                            <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                            <p
-                              className={`text-[10px] mt-1 ${
-                                isMine ? "text-primary-foreground/70" : "text-muted-foreground"
-                              }`}
-                            >
-                              {formatTime(msg.createdAt)}
-                            </p>
-                          </div>
-                        </div>
-                      )
-                    })
-                  )}
-                  <div ref={messagesEndRef} />
+              {/* Área de mensagens — coluna centralizada, ancorada embaixo */}
+              <div
+                ref={messagesScrollRef}
+                className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-4 md:px-6"
+              >
+                <div className="min-h-full flex flex-col justify-end">
+                  {messageBubbles}
                 </div>
-              </ScrollArea>
+              </div>
 
               <form
                 onSubmit={handleSend}
-                className="p-4 border-t border-border flex gap-2"
+                className={cn(
+                  "shrink-0 border-t border-border flex gap-2 bg-card/95 backdrop-blur-sm",
+                  "p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:p-4"
+                )}
               >
-                <Input
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  placeholder="Digite sua mensagem..."
-                  disabled={sending}
-                  className="flex-1"
-                  maxLength={4000}
-                />
-                <Button type="submit" disabled={sending || !draft.trim()} className="glow-effect">
-                  <Send className="w-4 h-4" />
-                </Button>
+                <div className="mx-auto w-full max-w-md flex gap-2">
+                  <Input
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    placeholder="Digite sua mensagem..."
+                    disabled={sending}
+                    className="flex-1"
+                    maxLength={4000}
+                  />
+                  <Button
+                    type="submit"
+                    disabled={sending || !draft.trim()}
+                    className="glow-effect shrink-0"
+                    size="icon"
+                  >
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
               </form>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center p-8 text-center text-muted-foreground">
-              <div>
+              <div className="max-w-xs mx-auto">
                 <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-30" />
                 <p className="font-medium">Selecione uma conversa</p>
                 <p className="text-sm mt-2">ou inicie pelo perfil de um candidato / vaga</p>
