@@ -15,7 +15,8 @@ const Navbar = dynamic(() => import("@/components/navbar").then(mod => ({ defaul
               <span className="text-foreground">Hubb</span>
             </div>
           </div>
-          <div className="flex items-center gap-6">
+          <div className="md:hidden h-9 w-9 bg-muted animate-pulse rounded-md" />
+          <div className="hidden md:flex items-center gap-6">
             <div className="h-8 w-32 bg-muted animate-pulse rounded" />
           </div>
         </div>
