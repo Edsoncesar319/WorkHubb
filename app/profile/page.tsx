@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { getCurrentUser, setCurrentUser } from "@/lib/auth"
-import { getUserApplications, getJobById, updateUser, addUser, getJobsByAuthor, getJobApplications, getUserExperiences, addExperience, updateExperience, deleteExperience, getUserById } from "@/lib/data"
+import { getUserApplications, getJobById, updateUser, addUser, getJobsByAuthor, getJobApplications, getUserExperiences, addExperience, updateExperience, deleteExperience, getUserById, updateJob } from "@/lib/data"
 import {
   compareInstants,
   compareMonthStrings,
@@ -55,7 +55,12 @@ import {
 import Link from "next/link"
 import { ChatMessageButton } from "@/components/chat-message-button"
 import { WorkModeBadge } from "@/components/work-mode-badge"
-import { getWorkMode, workModeLabel } from "@/lib/work-mode"
+import {
+  getWorkMode,
+  workModeLabel,
+  workModeToFields,
+  type WorkMode,
+} from "@/lib/work-mode"
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -68,6 +73,9 @@ export default function ProfilePage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isExperienceModalOpen, setIsExperienceModalOpen] = useState(false)
   const [editingExperience, setEditingExperience] = useState<Experience | null>(null)
+  const [isJobModalOpen, setIsJobModalOpen] = useState(false)
+  const [editingJob, setEditingJob] = useState<Job | null>(null)
+  const [jobSubmitError, setJobSubmitError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [editForm, setEditForm] = useState({
     name: "",
@@ -457,6 +465,66 @@ export default function ProfilePage() {
     current: false,
     description: ""
   })
+
+  const [jobForm, setJobForm] = useState({
+    title: "",
+    location: "",
+    workMode: "onsite" as WorkMode,
+    salary: "",
+    description: "",
+    requirements: "",
+  })
+
+  const handleEditJob = (job: Job) => {
+    setEditingJob(job)
+    setJobSubmitError(null)
+    setJobForm({
+      title: job.title,
+      location: job.location,
+      workMode: getWorkMode(job),
+      salary: job.salary || "",
+      description: job.description,
+      requirements: job.requirements.join(", "),
+    })
+    setIsJobModalOpen(true)
+  }
+
+  const handleSaveJob = async () => {
+    if (!user || !editingJob) return
+
+    setJobSubmitError(null)
+    setIsLoading(true)
+    try {
+      const { remote, hybrid } = workModeToFields(jobForm.workMode)
+      const updated = await updateJob(editingJob.id, {
+        authorId: user.id,
+        title: jobForm.title.trim(),
+        company: user.company || user.name,
+        location: jobForm.location.trim(),
+        remote,
+        hybrid,
+        salary: jobForm.salary.trim() || undefined,
+        description: jobForm.description.trim(),
+        requirements: jobForm.requirements
+          .split(",")
+          .map((r) => r.trim())
+          .filter(Boolean),
+      })
+      setCompanyJobs((prev) =>
+        prev
+          .map((j) => (j.id === updated.id ? updated : j))
+          .sort((a, b) => compareInstants(a.createdAt, b.createdAt))
+      )
+      setIsJobModalOpen(false)
+      setEditingJob(null)
+    } catch (error: unknown) {
+      setJobSubmitError(
+        error instanceof Error ? error.message : "Não foi possível salvar a vaga"
+      )
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleAddExperience = () => {
     setEditingExperience(null)
@@ -1098,7 +1166,15 @@ export default function ProfilePage() {
                                 {applications.length} {applications.length === 1 ? 'candidato' : 'candidatos'}
                               </span>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEditJob(job)}
+                              >
+                                <Edit className="w-4 h-4 mr-2" />
+                                Editar
+                              </Button>
                               <Link href={`/jobs/${job.id}`}>
                                 <Button variant="outline" size="sm">
                                   Ver Vaga
@@ -1552,6 +1628,130 @@ export default function ProfilePage() {
                 </Button>
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Editar vaga (empresa) */}
+        <Dialog
+          open={isJobModalOpen}
+          onOpenChange={(open) => {
+            setIsJobModalOpen(open)
+            if (!open) {
+              setEditingJob(null)
+              setJobSubmitError(null)
+            }
+          }}
+        >
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Vaga</DialogTitle>
+            </DialogHeader>
+
+            <form
+              className="space-y-4"
+              onSubmit={(e) => {
+                e.preventDefault()
+                handleSaveJob()
+              }}
+            >
+              <div className="space-y-2">
+                <Label htmlFor="job-title">Título da Vaga *</Label>
+                <Input
+                  id="job-title"
+                  value={jobForm.title}
+                  onChange={(e) => setJobForm({ ...jobForm, title: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="job-location">Localização *</Label>
+                  <Input
+                    id="job-location"
+                    value={jobForm.location}
+                    onChange={(e) => setJobForm({ ...jobForm, location: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="job-salary">Faixa Salarial</Label>
+                  <Input
+                    id="job-salary"
+                    value={jobForm.salary}
+                    onChange={(e) => setJobForm({ ...jobForm, salary: e.target.value })}
+                    placeholder="Ex: R$ 8.000 - R$ 12.000"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Modalidade de trabalho *</Label>
+                <div className="flex flex-wrap gap-2">
+                  {(["onsite", "remote", "hybrid"] as WorkMode[]).map((mode) => (
+                    <Button
+                      key={mode}
+                      type="button"
+                      variant={jobForm.workMode === mode ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setJobForm({ ...jobForm, workMode: mode })}
+                    >
+                      {workModeLabel(mode)}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="job-description">Descrição *</Label>
+                <Textarea
+                  id="job-description"
+                  value={jobForm.description}
+                  onChange={(e) => setJobForm({ ...jobForm, description: e.target.value })}
+                  rows={5}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="job-requirements">Requisitos (separados por vírgula) *</Label>
+                <Textarea
+                  id="job-requirements"
+                  value={jobForm.requirements}
+                  onChange={(e) => setJobForm({ ...jobForm, requirements: e.target.value })}
+                  rows={3}
+                  required
+                />
+              </div>
+
+              {jobSubmitError && (
+                <p className="text-sm text-destructive">{jobSubmitError}</p>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsJobModalOpen(false)}
+                  disabled={isLoading}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  className="glow-effect"
+                  disabled={
+                    isLoading ||
+                    !jobForm.title.trim() ||
+                    !jobForm.location.trim() ||
+                    !jobForm.description.trim() ||
+                    !jobForm.requirements.trim()
+                  }
+                >
+                  {isLoading ? "Salvando..." : "Salvar alterações"}
+                </Button>
+              </div>
+            </form>
           </DialogContent>
         </Dialog>
 

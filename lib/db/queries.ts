@@ -321,15 +321,32 @@ export async function updateJob(
   job: Partial<NewJob>
 ): Promise<Job | undefined> {
   try {
+    const data: {
+      title?: string;
+      company?: string;
+      location?: string;
+      remote?: boolean;
+      hybrid?: boolean;
+      salary?: string | null;
+      description?: string;
+      requirements?: string;
+    } = {};
+
+    if (job.title !== undefined) data.title = job.title;
+    if (job.company !== undefined) data.company = job.company;
+    if (job.location !== undefined) data.location = job.location;
+    if (job.remote !== undefined) data.remote = job.remote;
+    if (job.hybrid !== undefined) data.hybrid = job.hybrid;
+    if (job.salary !== undefined) data.salary = job.salary ?? null;
+    if (job.description !== undefined) data.description = job.description;
+    if (job.requirements !== undefined) {
+      data.requirements = JSON.stringify(job.requirements);
+    }
+
     const row = await withPrisma((db) =>
       db.job.update({
         where: { id },
-        data: {
-          ...job,
-          requirements: job.requirements
-            ? JSON.stringify(job.requirements)
-            : undefined,
-        },
+        data,
       })
     );
     return mapJob(row);

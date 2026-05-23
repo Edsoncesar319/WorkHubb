@@ -51,6 +51,28 @@ export async function addJob(job: Omit<Job, "id" | "createdAt">): Promise<Job> {
   return await response.json()
 }
 
+export async function updateJob(
+  id: string,
+  job: Partial<Omit<Job, 'id' | 'createdAt'>> & { authorId: string }
+): Promise<Job> {
+  const response = await fetch(`/api/jobs/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(job),
+  })
+  if (!response.ok) {
+    let errorMessage = 'Não foi possível atualizar a vaga'
+    try {
+      const errorData = await response.json()
+      errorMessage = errorData.error || errorMessage
+    } catch {
+      /* ignore */
+    }
+    throw new Error(errorMessage)
+  }
+  return await response.json()
+}
+
 // Funções para candidaturas
 export async function getApplications(): Promise<Application[]> {
   const response = await fetch('/api/applications')
