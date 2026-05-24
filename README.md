@@ -1,4 +1,4 @@
-# WorkHubb - Job Board
+Work Hubb
 
 Uma plataforma moderna e intuitiva que conecta talentos de tecnologia com as melhores oportunidades do mercado brasileiro.
 
