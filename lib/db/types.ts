@@ -11,6 +11,7 @@ export interface User {
   stack: string | null;
   github: string | null;
   linkedin: string | null;
+  website: string | null;
   company: string | null;
   profilePhoto: string | null;
   resumeUrl: string | null;
@@ -27,6 +28,7 @@ export interface NewUser {
   stack?: string | null;
   github?: string | null;
   linkedin?: string | null;
+  website?: string | null;
   company?: string | null;
   profilePhoto?: string | null;
   resumeUrl?: string | null;

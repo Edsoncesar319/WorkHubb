@@ -26,6 +26,7 @@ export default function RegisterPage() {
     github: "",
     linkedin: "",
     company: "",
+    website: "",
   })
   const [error, setError] = useState("")
 
@@ -62,6 +63,13 @@ export default function RegisterPage() {
         console.warn('Error checking if email exists:', emailCheckError)
       }
 
+      const websiteRaw = formData.website.trim()
+      const website = websiteRaw
+        ? /^https?:\/\//i.test(websiteRaw)
+          ? websiteRaw
+          : `https://${websiteRaw}`
+        : undefined
+
       const newUser: User = {
         id: Date.now().toString(),
         name: formData.name,
@@ -71,7 +79,8 @@ export default function RegisterPage() {
         stack: formData.stack || undefined,
         github: formData.github || undefined,
         linkedin: formData.linkedin || undefined,
-        company: userType === "company" ? formData.company : undefined,
+        company: userType === "company" ? formData.company || formData.name : undefined,
+        website,
         profilePhoto: undefined,
         createdAt: new Date().toISOString(),
       }
@@ -166,6 +175,30 @@ export default function RegisterPage() {
                 required
               />
             </div>
+
+            {userType === "company" && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="company">Nome da empresa</Label>
+                  <Input
+                    id="company"
+                    value={formData.company}
+                    onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                    placeholder="Nome fantasia ou razão social"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="website">Site da empresa</Label>
+                  <Input
+                    id="website"
+                    type="url"
+                    value={formData.website}
+                    onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                    placeholder="https://www.suaempresa.com.br"
+                  />
+                </div>
+              </>
+            )}
 
             {userType === "professional" && (
               <>

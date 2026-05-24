@@ -29,6 +29,7 @@ function mapUser(row: {
   stack: string | null;
   github: string | null;
   linkedin: string | null;
+  website: string | null;
   company: string | null;
   profilePhoto: string | null;
   resumeUrl: string | null;
@@ -211,6 +212,7 @@ export async function createUser(user: NewUser): Promise<User> {
         stack: user.stack ?? null,
         github: user.github ?? null,
         linkedin: user.linkedin ?? null,
+        website: user.website ?? null,
         company: user.company ?? null,
         profilePhoto: user.profilePhoto ?? null,
         resumeUrl: user.resumeUrl ?? null,
@@ -233,6 +235,7 @@ function buildUserUpdateData(user: Partial<NewUser>) {
   if (user.stack !== undefined) data.stack = user.stack;
   if (user.github !== undefined) data.github = user.github;
   if (user.linkedin !== undefined) data.linkedin = user.linkedin;
+  if (user.website !== undefined) data.website = user.website;
   if (user.company !== undefined) data.company = user.company;
   if (user.profilePhoto !== undefined) data.profilePhoto = user.profilePhoto;
   if (user.resumeUrl !== undefined) data.resumeUrl = user.resumeUrl;

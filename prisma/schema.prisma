@@ -21,6 +21,7 @@ model User {
   stack        String?
   github       String?
   linkedin     String?
+  website      String?
   company      String?
   profilePhoto   String?  @map("profile_photo")
   resumeUrl      String?  @map("resume_url")

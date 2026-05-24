@@ -384,6 +384,7 @@ export async function getUserByIdForChat(id: string): Promise<User | undefined> 
       stack: row.stack,
       github: row.github,
       linkedin: row.linkedin,
+      website: row.website,
       company: row.company,
       profilePhoto: row.profilePhoto,
       resumeUrl: row.resumeUrl,

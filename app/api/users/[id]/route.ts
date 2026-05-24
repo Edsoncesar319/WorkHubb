@@ -34,7 +34,9 @@ export async function PUT(
     console.error('Error updating user:', error);
     const message =
       error instanceof Error ? error.message : 'Failed to update user';
-    const needsGenerate = message.includes('Unknown argument `resumeUrl`');
+    const needsGenerate =
+      message.includes('Unknown argument `resumeUrl`') ||
+      message.includes('Unknown argument `website`');
     return NextResponse.json(
       {
         error: needsGenerate

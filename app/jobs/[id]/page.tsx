@@ -170,14 +170,14 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             {user && user.type === "professional" && job.authorId && user.id !== job.authorId && (
               <div className="pt-4 border-t border-border">
                 <p className="text-sm text-muted-foreground mb-3">
-                  Tire dúvidas com quem publicou a vaga
+                  Tire dúvidas com o responsável pela vaga
                 </p>
                 <ChatMessageButton
                   otherUserId={job.authorId}
                   jobId={job.id}
                   variant="outline"
                   className="w-full"
-                  label="Falar com a empresa"
+                  label="Falar com responsável"
                 />
               </div>
             )}

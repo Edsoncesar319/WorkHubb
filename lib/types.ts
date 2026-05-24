@@ -9,6 +9,7 @@ export interface User {
   stack?: string
   github?: string
   linkedin?: string
+  website?: string
   company?: string
   profilePhoto?: string
   resumeUrl?: string

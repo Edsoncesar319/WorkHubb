@@ -29,7 +29,8 @@ import { ImageCropper } from "@/components/image-cropper"
 import type { User, Application, Job, Experience } from "@/lib/types"
 import { 
   Github, 
-  Linkedin, 
+  Linkedin,
+  Globe,
   Mail, 
   Briefcase, 
   MapPin, 
@@ -62,6 +63,17 @@ import {
   type WorkMode,
 } from "@/lib/work-mode"
 
+function normalizeWebsite(value: string): string | undefined {
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  return `https://${trimmed}`
+}
+
+function externalHref(value: string) {
+  return value.startsWith("http") ? value : `https://${value}`
+}
+
 export default function ProfilePage() {
   const router = useRouter()
   const { isInitialized } = useDatabaseSync()
@@ -83,6 +95,8 @@ export default function ProfilePage() {
     stack: "",
     github: "",
     linkedin: "",
+    website: "",
+    company: "",
     profilePhoto: ""
   })
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
@@ -119,6 +133,7 @@ export default function ProfilePage() {
         stack: userToUse.stack || "",
         github: userToUse.github || "",
         linkedin: userToUse.linkedin || "",
+        website: userToUse.website || "",
         profilePhoto: userToUse.profilePhoto || ""
       })
 
@@ -180,6 +195,8 @@ export default function ProfilePage() {
         stack: user.stack || "",
         github: user.github || "",
         linkedin: user.linkedin || "",
+        website: user.website || "",
+        company: user.company || "",
         profilePhoto: user.profilePhoto || ""
       })
     }
@@ -226,6 +243,8 @@ export default function ProfilePage() {
         stack: editForm.stack,
         github: editForm.github,
         linkedin: editForm.linkedin,
+        website: normalizeWebsite(editForm.website),
+        company: user.type === "company" ? editForm.company.trim() || null : user.company,
         profilePhoto: profilePhoto
       })
 
@@ -247,7 +266,9 @@ export default function ProfilePage() {
           stack: editForm.stack,
           github: editForm.github,
           linkedin: editForm.linkedin,
-          company: user.company,
+          website: normalizeWebsite(editForm.website),
+          company:
+            user.type === "company" ? editForm.company.trim() || undefined : user.company,
           profilePhoto: profilePhoto,
         })
         setUser(newUser)
@@ -955,39 +976,84 @@ export default function ProfilePage() {
               <h3 className="font-bold mb-4">Informações de Contato</h3>
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <Mail className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm">{user.email}</span>
+                  <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-sm break-all">{user.email}</span>
                 </div>
 
-            {user.github && (
+                {user.type === "company" && (
                   <div className="flex items-center gap-3">
-                    <Github className="w-4 h-4 text-muted-foreground" />
-                <a
-                  href={user.github?.startsWith("http") ? user.github : `https://${user.github}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                      className="text-sm hover:text-primary transition-colors"
-                >
-                      GitHub
-                </a>
-              </div>
-            )}
+                    <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <span className="text-sm font-medium">
+                      {user.company || user.name}
+                    </span>
+                  </div>
+                )}
 
-            {user.linkedin && (
+                {(user.type === "company" || user.website) && (
+                  <div className="flex items-start gap-3">
+                    <Globe className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                    {user.website ? (
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-muted-foreground mb-0.5">
+                          {user.type === "company" ? "Site da empresa" : "Site"}
+                        </p>
+                        <a
+                          href={externalHref(user.website)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-primary hover:underline break-all"
+                        >
+                          {user.website.replace(/^https?:\/\//i, "")}
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="flex-1">
+                        <p className="text-xs text-muted-foreground mb-1">Site da empresa</p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Nenhum site cadastrado
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleEditProfile}
+                        >
+                          <Edit className="w-3 h-3 mr-1" />
+                          Cadastrar site
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {user.linkedin && (
                   <div className="flex items-center gap-3">
-                    <Linkedin className="w-4 h-4 text-muted-foreground" />
-                <a
-                  href={user.linkedin?.startsWith("http") ? user.linkedin : `https://${user.linkedin}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                    <Linkedin className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <a
+                      href={externalHref(user.linkedin)}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="text-sm hover:text-primary transition-colors"
-                >
+                    >
                       LinkedIn
-                </a>
+                    </a>
+                  </div>
+                )}
+
+                {user.github && (
+                  <div className="flex items-center gap-3">
+                    <Github className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <a
+                      href={externalHref(user.github)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm hover:text-primary transition-colors"
+                    >
+                      GitHub
+                    </a>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </Card>
+            </Card>
 
             {/* Profile Completion */}
             <Card className="p-6">
@@ -1087,7 +1153,7 @@ export default function ProfilePage() {
                             otherUserId={app.job.authorId}
                             jobId={app.job.id}
                             size="sm"
-                            label="Falar com empresa"
+                            label="Falar com responsável"
                           />
                         )}
                         </div>
@@ -1415,7 +1481,7 @@ export default function ProfilePage() {
                                       <>
                                         {candidate.github && (
                                           <a
-                                            href={candidate.github.startsWith("http") ? candidate.github : `https://${candidate.github}`}
+                                            href={externalHref(candidate.github)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                           >
@@ -1427,13 +1493,25 @@ export default function ProfilePage() {
                                         )}
                                         {candidate.linkedin && (
                                           <a
-                                            href={candidate.linkedin.startsWith("http") ? candidate.linkedin : `https://${candidate.linkedin}`}
+                                            href={externalHref(candidate.linkedin)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                           >
                                             <Button variant="outline" size="sm">
                                               <Linkedin className="w-4 h-4 mr-2" />
                                               LinkedIn
+                                            </Button>
+                                          </a>
+                                        )}
+                                        {candidate.website && (
+                                          <a
+                                            href={externalHref(candidate.website)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                          >
+                                            <Button variant="outline" size="sm">
+                                              <Globe className="w-4 h-4 mr-2" />
+                                              Site
                                             </Button>
                                           </a>
                                         )}
@@ -1610,6 +1688,44 @@ export default function ProfilePage() {
                   placeholder="https://linkedin.com/in/seuusuario"
                 />
               </div>
+
+              {/* Website */}
+              <div className="space-y-2">
+                <Label htmlFor="website">
+                  {user?.type === "company" ? "Site da empresa" : "Site"}
+                </Label>
+                <Input
+                  id="website"
+                  type="url"
+                  value={editForm.website}
+                  onChange={(e) => handleInputChange("website", e.target.value)}
+                  placeholder={
+                    user?.type === "company"
+                      ? "https://www.suaempresa.com.br"
+                      : "https://seuportfolio.dev"
+                  }
+                />
+                <p className="text-sm text-muted-foreground">
+                  {user?.type === "company"
+                    ? "Aparece em Informações de Contato no seu perfil"
+                    : "Portfólio ou página profissional"}
+                </p>
+              </div>
+
+              {user?.type === "company" && (
+                <div className="space-y-2">
+                  <Label htmlFor="company">Nome da empresa (opcional)</Label>
+                  <Input
+                    id="company"
+                    value={editForm.company}
+                    onChange={(e) => handleInputChange("company", e.target.value)}
+                    placeholder="Razão social ou nome fantasia"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Se vazio, usamos o nome do perfil
+                  </p>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex justify-end gap-3 pt-4">
