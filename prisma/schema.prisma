@@ -19,6 +19,7 @@ model User {
   type         String
   bio          String?
   stack        String?
+  stackSkills  String?  @map("stack_skills")
   github       String?
   linkedin     String?
   website      String?

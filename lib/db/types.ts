@@ -9,6 +9,7 @@ export interface User {
   type: UserType;
   bio: string | null;
   stack: string | null;
+  stackSkills: string | null;
   github: string | null;
   linkedin: string | null;
   website: string | null;
@@ -26,6 +27,7 @@ export interface NewUser {
   type: UserType;
   bio?: string | null;
   stack?: string | null;
+  stackSkills?: string | null;
   github?: string | null;
   linkedin?: string | null;
   website?: string | null;

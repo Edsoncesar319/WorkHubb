@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { getCurrentUser } from "@/lib/auth"
 import { ChatMessageButton } from "@/components/chat-message-button"
 import { getCandidateProfile, type CandidateProfile } from "@/lib/data"
+import { TechnicalStackSection } from "@/components/technical-stack-section"
 import { useDatabaseSync } from "@/hooks/use-database-sync"
 import {
   compareInstants,
@@ -246,20 +247,12 @@ export default function CandidateProfilePage() {
           </Card>
         )}
 
-        {candidate.stack && (
-          <Card className="p-6">
-            <h2 className="text-lg font-bold flex items-center gap-2 mb-4">
-              <Award className="w-5 h-5 text-primary" />
-              Habilidades
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {candidate.stack.split(",").map((skill, idx) => (
-                <Badge key={idx} variant="outline">
-                  {skill.trim()}
-                </Badge>
-              ))}
-            </div>
-          </Card>
+        {(candidate.stackSkills || candidate.stack) && (
+          <TechnicalStackSection
+            stackSkillsJson={candidate.stackSkills}
+            legacyStack={candidate.stack}
+            editable={false}
+          />
         )}
 
         {highlightedApplication && (

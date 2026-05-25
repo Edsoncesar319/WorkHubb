@@ -7,6 +7,7 @@ export interface User {
   type: UserType
   bio?: string
   stack?: string
+  stackSkills?: string
   github?: string
   linkedin?: string
   website?: string

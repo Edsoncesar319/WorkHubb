@@ -56,6 +56,13 @@ import {
 import Link from "next/link"
 import { ChatMessageButton } from "@/components/chat-message-button"
 import { WorkModeBadge } from "@/components/work-mode-badge"
+import { TechnicalStackSection } from "@/components/technical-stack-section"
+import {
+  type StackSkill,
+  parseStackSkills,
+  serializeStackSkills,
+  stackSkillsToLegacyStack,
+} from "@/lib/stack-skills"
 import {
   getWorkMode,
   workModeLabel,
@@ -705,9 +712,9 @@ export default function ProfilePage() {
                 </div>
                 <div className="text-center p-4 bg-muted/30 rounded-lg">
                   <div className="text-2xl font-bold text-blue-600">
-                    {user.stack ? user.stack.split(',').length : 0}
+                    {parseStackSkills(user.stackSkills, user.stack).length}
                   </div>
-                  <div className="text-sm text-muted-foreground">Habilidades</div>
+                  <div className="text-sm text-muted-foreground">Stacks</div>
                 </div>
               </div>
             )}
@@ -766,22 +773,27 @@ export default function ProfilePage() {
               )}
             </Card>
 
-            {/* Skills Section */}
-            {user.stack && (
-              <Card className="p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Award className="w-5 h-5 text-primary" />
-                  <h2 className="text-xl font-bold">Habilidades Técnicas</h2>
-                </div>
-                
-                <div className="flex flex-wrap gap-2">
-                  {user.stack?.split(",").map((tech, index) => (
-                    <Badge key={index} variant="secondary" className="px-3 py-1">
-                      {tech?.trim() || ""}
-                    </Badge>
-                  ))}
-                </div>
-              </Card>
+            {/* Stacks técnicas com anos de experiência */}
+            {user.type === "professional" && (
+              <TechnicalStackSection
+                stackSkillsJson={user.stackSkills}
+                legacyStack={user.stack}
+                updatedAt={user.createdAt}
+                editable
+                onSave={async (skills: StackSkill[]) => {
+                  if (!user) return
+                  const stackSkills = serializeStackSkills(skills)
+                  const stack = stackSkillsToLegacyStack(skills)
+                  const updated = await updateUser(user.id, {
+                    stackSkills: stackSkills || null,
+                    stack: stack || null,
+                  })
+                  if (updated) {
+                    setUser(updated)
+                    setCurrentUser(updated)
+                  }
+                }}
+              />
             )}
 
             {/* Resume Section — candidato */}
@@ -1361,7 +1373,18 @@ export default function ProfilePage() {
                           </h4>
                           
                           {applications.map(({ application, user: candidate }) => {
-                            const { matching, missing } = getMatchingSkills(candidate?.stack, job.requirements)
+                            const candidateStackText =
+                              candidate?.stack ||
+                              stackSkillsToLegacyStack(
+                                parseStackSkills(
+                                  candidate?.stackSkills,
+                                  candidate?.stack
+                                )
+                              )
+                            const { matching, missing } = getMatchingSkills(
+                              candidateStackText,
+                              job.requirements
+                            )
                             const matchPercentage = job.requirements.length > 0 
                               ? Math.round((matching.length / job.requirements.length) * 100) 
                               : 0
@@ -1409,30 +1432,47 @@ export default function ProfilePage() {
                                   </div>
 
                                   {/* Skills Comparison */}
-                                  {candidate?.stack && (
+                                  {(candidate?.stackSkills || candidate?.stack) && (
                                     <div className="space-y-2">
                                       <div className="flex items-center justify-between">
-                                        <h5 className="text-sm font-semibold">Habilidades do Candidato</h5>
+                                        <h5 className="text-sm font-semibold">Stacks do candidato</h5>
                                         <span className="text-xs text-muted-foreground">
-                                          {matching.length} de {job.requirements.length} requisitos atendidos
+                                          {matching.length} de {job.requirements.length} requisitos
                                         </span>
                                       </div>
-                                      <div className="flex flex-wrap gap-1">
-                                        {candidate.stack.split(',').map((tech, idx) => {
-                                          const techLower = tech.trim().toLowerCase()
-                                          const isMatching = matching.some(req => 
-                                            req.includes(techLower) || techLower.includes(req) ||
-                                            techLower.split(' ').some(word => req.includes(word)) ||
-                                            req.split(' ').some(word => techLower.includes(word))
+                                      <div className="space-y-2">
+                                        {parseStackSkills(
+                                          candidate.stackSkills,
+                                          candidate.stack
+                                        ).map((skill, idx) => {
+                                          const techLower = skill.name.toLowerCase()
+                                          const isMatching = matching.some(
+                                            (req) =>
+                                              req.includes(techLower) ||
+                                              techLower.includes(req)
                                           )
                                           return (
-                                            <Badge 
-                                              key={idx} 
-                                              variant={isMatching ? "default" : "outline"} 
-                                              className="text-xs"
-                                            >
-                                              {tech.trim()}
-                                            </Badge>
+                                            <div key={idx} className="space-y-1">
+                                              <div className="flex justify-between text-xs">
+                                                <span
+                                                  className={
+                                                    isMatching
+                                                      ? "text-green-600 font-medium"
+                                                      : ""
+                                                  }
+                                                >
+                                                  {skill.name}
+                                                </span>
+                                                <span className="text-muted-foreground">
+                                                  {skill.years}{" "}
+                                                  {skill.years === 1 ? "ano" : "anos"}
+                                                </span>
+                                              </div>
+                                              <Progress
+                                                value={skill.years * 10}
+                                                className="h-1.5"
+                                              />
+                                            </div>
                                           )
                                         })}
                                       </div>
@@ -1653,19 +1693,12 @@ export default function ProfilePage() {
                 />
               </div>
 
-              {/* Stack */}
-              <div className="space-y-2">
-                <Label htmlFor="stack">Habilidades Técnicas</Label>
-                <Input
-                  id="stack"
-                  value={editForm.stack}
-                  onChange={(e) => handleInputChange("stack", e.target.value)}
-                  placeholder="React, Node.js, TypeScript, Python..."
-                />
-                <p className="text-sm text-muted-foreground">
-                  Separe as tecnologias por vírgula
+              {user?.type === "professional" && (
+                <p className="text-sm text-muted-foreground rounded-lg border border-border p-3">
+                  Stacks técnicas com anos de experiência são editadas no card{" "}
+                  <strong>Experiência em stacks técnicas</strong> (botão Gerenciar stacks).
                 </p>
-              </div>
+              )}
 
               {/* GitHub */}
               <div className="space-y-2">

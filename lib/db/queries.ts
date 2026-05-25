@@ -27,6 +27,7 @@ function mapUser(row: {
   type: string;
   bio: string | null;
   stack: string | null;
+  stackSkills: string | null;
   github: string | null;
   linkedin: string | null;
   website: string | null;
@@ -43,6 +44,7 @@ function mapUser(row: {
     type: row.type as User['type'],
     bio: row.bio,
     stack: row.stack,
+    stackSkills: row.stackSkills,
     github: row.github,
     linkedin: row.linkedin,
     company: row.company,
@@ -210,6 +212,7 @@ export async function createUser(user: NewUser): Promise<User> {
         type: user.type,
         bio: user.bio ?? null,
         stack: user.stack ?? null,
+        stackSkills: user.stackSkills ?? null,
         github: user.github ?? null,
         linkedin: user.linkedin ?? null,
         website: user.website ?? null,
@@ -233,6 +236,7 @@ function buildUserUpdateData(user: Partial<NewUser>) {
   if (user.type !== undefined) data.type = user.type;
   if (user.bio !== undefined) data.bio = user.bio;
   if (user.stack !== undefined) data.stack = user.stack;
+  if (user.stackSkills !== undefined) data.stackSkills = user.stackSkills;
   if (user.github !== undefined) data.github = user.github;
   if (user.linkedin !== undefined) data.linkedin = user.linkedin;
   if (user.website !== undefined) data.website = user.website;
