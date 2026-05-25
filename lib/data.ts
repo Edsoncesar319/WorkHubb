@@ -301,7 +301,7 @@ export async function updateUser(id: string, user: Partial<User>): Promise<User 
     return await response.json()
   } catch (error) {
     console.error('Error updating user:', error)
-    return undefined
+    throw error
   }
 }
 

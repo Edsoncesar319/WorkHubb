@@ -41,13 +41,14 @@ export function StackSkillsModal({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Só carrega do servidor ao abrir — evita apagar itens digitados quando o pai re-renderiza
   useEffect(() => {
-    if (open) {
-      setSkills(initialSkills.map((s) => ({ ...s, years: clampStackYears(s.years) })))
-      setNewSkillName("")
-      setError(null)
-    }
-  }, [open, initialSkills])
+    if (!open) return
+    setSkills(initialSkills.map((s) => ({ ...s, years: clampStackYears(s.years) })))
+    setNewSkillName("")
+    setError(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshot só na abertura
+  }, [open])
 
   const addSkill = () => {
     const name = newSkillName.trim()
@@ -72,6 +73,10 @@ export function StackSkillsModal({
   }
 
   const handleSave = async () => {
+    if (skills.length === 0) {
+      setError("Adicione pelo menos uma tecnologia antes de salvar")
+      return
+    }
     setSaving(true)
     setError(null)
     try {
@@ -101,13 +106,22 @@ export function StackSkillsModal({
         <div className="space-y-4">
           <div className="flex gap-2">
             <Input
+              id="stack-skill-name"
               value={newSkillName}
               onChange={(e) => setNewSkillName(e.target.value)}
               placeholder="Ex: React, TypeScript, Node.js..."
               onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSkill())}
+              aria-label="Nome da tecnologia"
             />
-            <Button type="button" variant="outline" onClick={addSkill}>
-              <Plus className="w-4 h-4" />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={addSkill}
+              disabled={!newSkillName.trim()}
+              className="shrink-0"
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Adicionar
             </Button>
           </div>
 

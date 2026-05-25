@@ -781,17 +781,20 @@ export default function ProfilePage() {
                 updatedAt={user.createdAt}
                 editable
                 onSave={async (skills: StackSkill[]) => {
-                  if (!user) return
+                  if (!user) throw new Error("Sessão inválida. Faça login novamente.")
                   const stackSkills = serializeStackSkills(skills)
                   const stack = stackSkillsToLegacyStack(skills)
                   const updated = await updateUser(user.id, {
                     stackSkills: stackSkills || null,
                     stack: stack || null,
                   })
-                  if (updated) {
-                    setUser(updated)
-                    setCurrentUser(updated)
+                  if (!updated) {
+                    throw new Error(
+                      "Não foi possível salvar. Reinicie o servidor (npm run dev) e tente de novo."
+                    )
                   }
+                  setUser(updated)
+                  setCurrentUser(updated)
                 }}
               />
             )}

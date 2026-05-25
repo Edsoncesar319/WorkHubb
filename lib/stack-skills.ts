@@ -9,7 +9,9 @@ const MIN_YEARS = 1
 const MAX_YEARS = 10
 
 export function clampStackYears(years: number): number {
-  return Math.min(MAX_YEARS, Math.max(MIN_YEARS, Math.round(years)))
+  const n = Math.round(Number(years))
+  if (!Number.isFinite(n)) return MIN_YEARS
+  return Math.min(MAX_YEARS, Math.max(MIN_YEARS, n))
 }
 
 export function parseStackSkills(

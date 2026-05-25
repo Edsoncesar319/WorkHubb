@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -31,7 +31,10 @@ export function TechnicalStackSection({
   onSave,
 }: TechnicalStackSectionProps) {
   const [modalOpen, setModalOpen] = useState(false)
-  const skills = parseStackSkills(stackSkillsJson, legacyStack)
+  const skills = useMemo(
+    () => parseStackSkills(stackSkillsJson, legacyStack),
+    [stackSkillsJson, legacyStack]
+  )
 
   const handleSave = async (next: StackSkill[]) => {
     if (!onSave) return

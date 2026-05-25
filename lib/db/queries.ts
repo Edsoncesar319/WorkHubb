@@ -47,6 +47,7 @@ function mapUser(row: {
     stackSkills: row.stackSkills,
     github: row.github,
     linkedin: row.linkedin,
+    website: row.website,
     company: row.company,
     profilePhoto: row.profilePhoto,
     resumeUrl: row.resumeUrl,
